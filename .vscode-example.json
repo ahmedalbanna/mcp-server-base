@@ -1,0 +1,11 @@
+{
+  "mcp": {
+    "servers": {
+      "mcp-server-base": {
+        "command": "node",
+        "args": ["${workspaceFolder}/dist/index.js"],
+        "env": {}
+      }
+    }
+  }
+}
