@@ -43,7 +43,7 @@
     "url": "https://github.com/ahmedalbanna/mcp-server-base/issues"
   },
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=20.0.0"
   },
   "publishConfig": {
     "access": "public"
@@ -53,12 +53,15 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.1",
+    "express-rate-limit": "^8.6.2",
+    "helmet": "^7.2.0",
     "zod": "^3.23.8",
     "zod-to-json-schema": "^3.23.5"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
+    "@types/helmet": "^0.0.48",
     "@types/node": "^22.10.5",
     "@typescript-eslint/eslint-plugin": "^8.19.0",
     "@typescript-eslint/parser": "^8.19.0",

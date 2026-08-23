@@ -11,11 +11,11 @@ Modern **Model Context Protocol** server using the latest stack:
 
 - **MCP SDK `1.12+`** — `McpServer` high-level API + `StreamableHTTPServerTransport` (new) & `StdioServerTransport`
 - **TypeScript 5.7 ESM** + `NodeNext` module
-- **Zod** validation → auto JSON Schema
-- **Express 4** for HTTP + CORS + health check
-- Dual transport: **STDIO** (Claude Desktop) and **Streamable HTTP** (remote, 2025-03 spec)
+- **Zod** validation → auto JSON Schema + env validation (`src/config.ts:1`)
+- **Express 4** + **helmet** + **CORS allowlist** + **rate-limit** + health/ready
+- Dual transport: **STDIO** (Claude Desktop) and **Streamable HTTP** (remote, 2025-03 spec, stateless + stateful resumability)
 - Structured tool/resource/prompt modules
-- `tsx` watch, `vitest`, graceful shutdown
+- `tsx` watch, `vitest` (67 tests, 98% coverage), graceful shutdown
 
 ---
 
@@ -136,30 +136,47 @@ docker run -p 3000:3000 --env TRANSPORT=http mcp-server-base
 
 ```
 src/
-├── index.ts        # entry: stdio + http dual transport
-├── server.ts       # createMcpServer() factory
-├── config.ts       # env config
-├── types.ts        # Zod schemas
-├── utils/logger.ts # stderr logger (stdio-safe)
-├── tools/          # registerAllTools()
-├── resources/      # registerAllResources()
-└── prompts/        # registerAllPrompts()
+├── index.ts              # entry: stdio + http (helmet/cors/rateLimit/auth/resumability)
+├── server.ts             # createMcpServer() factory
+├── config.ts             # zod env validation (AUTH_MODE, CORS, rateLimit, resumability)
+├── types.ts              # Zod schemas
+├── middleware/auth.ts    # AUTH_MODE none|apiKey|bearer
+├── middleware/rateLimit.ts
+├── middleware/requestId.ts
+├── utils/logger.ts       # stderr, JSON/text, redaction, child(requestId)
+├── utils/eventStore.ts   # InMemoryEventStore for Last-Event-ID
+├── tools/                # registerAllTools()
+├── resources/            # registerAllResources()
+└── prompts/              # registerAllPrompts()
 ```
 
 Add a new tool: create `src/tools/my.tool.ts` → export `registerMyTool(server)` → add to `src/tools/index.ts`.
 
 ---
 
+## 🔐 Security (Phase 2) — New
+
+- **Helmet** headers (`x-dns-prefetch-control`, `x-frame-options`, `x-content-type-options`, etc.) via `helmet@7` (`src/index.ts:1`)
+- **CORS allowlist** (`CORS_ORIGIN=*` or comma list) with `cors` credentials handling (`src/config.ts:60`)
+- **Auth** `AUTH_MODE=none|apiKey|bearer` at `src/middleware/auth.ts:1` — `401` without valid `X-API-Key` or `Authorization: Bearer` (health/ready & OPTIONS excluded)
+- **Rate limiting** `express-rate-limit` (default 100/15min) on `/mcp` — `429 Too Many Requests` (`src/middleware/rateLimit.ts:1`)
+- **RequestId** (`X-Request-Id` randomUUID, echo header, child logger correlation) (`src/middleware/requestId.ts:1`)
+- **Zod env validation** (`src/config.ts:1`) — `parseEnv()` validates `PORT`, `AUTH_MODE`, `API_KEY` cross-field, fails fast on invalid env
+- **Structured logger** JSON/text, `[REDACTED]` for `authorization`, `apiKey`, `token` (`src/utils/logger.ts:24`)
+- **Resumability** `InMemoryEventStore` (`src/utils/eventStore.ts:1`) + stateful session map when `RESUMABILITY_ENABLED=true` (replay via `Last-Event-ID`, `GET /mcp` stream, `DELETE` close)
+- **Docker hardening** non-root `appuser` + `HEALTHCHECK` (`Dockerfile:1`)
+- Tests: `tests/unit/auth.test.ts`, `tests/unit/logger.test.ts`, `tests/unit/eventStore.test.ts`, `tests/e2e/security.test.ts` (helmet/auth/rateLimit/resumability) — `67 tests, 98% coverage`
+
 ## 🔐 Best Practices Included
 
-- Logger uses `console.error` (stderr) so logs don't corrupt stdio stdout (`src/utils/logger.ts:1`)
+- Logger stderr-safe, never logs secrets (redaction)
 - Zod → JSON Schema via SDK (`src/types.ts:1`, `src/tools/*.tool.ts`)
 - Timeout on fetch (10s) + structured errors
-- Graceful SIGINT/SIGTERM (`src/index.ts:86`)
-- Health endpoint separate from MCP (`GET /health`)
-- Stateless Streamable HTTP per-request (`sessionIdGenerator: undefined`, `src/index.ts:22`)
+- Graceful shutdown (`SIGINT/SIGTERM`)
+- Health (`GET /health`) & ready (`GET /ready`) separate from MCP
+- Stateless default (`sessionIdGenerator: undefined`), stateful when `RESUMABILITY_ENABLED=true` (`src/index.ts:22`)
 - Type-safe, strict TS + ESLint flat + Prettier + husky + lint-staged
-- Coverage 80% enforced (`vitest.config.ts:1`), E2E HTTP tests (`tests/e2e/http.test.ts:1`)
+- Coverage 80% enforced (`vitest.config.ts:1`), E2E HTTP + security tests (`tests/e2e/*.test.ts:1`)
 
 ## 🤝 Contributing
 

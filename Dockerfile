@@ -10,9 +10,14 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV TRANSPORT=http
+# Create non-root user (Phase 2 hardening)
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=builder /app/dist ./dist
+# Drop privileges
+RUN chown -R appuser:appgroup /app
+USER appuser
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
