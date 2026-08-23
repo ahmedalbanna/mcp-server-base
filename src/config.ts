@@ -10,9 +10,9 @@ const envSchema = z.object({
     .pipe(z.number().int().min(1).max(65535)),
   HOST: z.string().default('0.0.0.0'),
   MCP_SERVER_NAME: z.string().default('mcp-server-base'),
-  MCP_SERVER_VERSION: z.string().default('2.2.0'),
+  MCP_SERVER_VERSION: z.string().default('3.0.0'),
   CORS_ORIGIN: z.string().default('*'),
-  AUTH_MODE: z.enum(['none', 'apiKey', 'bearer']).default('none'),
+  AUTH_MODE: z.enum(['none', 'apiKey', 'bearer', 'oidc']).default('none'),
   API_KEY: z.string().optional(),
   BEARER_TOKEN: z.string().optional(),
   AUTH_TOKEN: z.string().optional(), // alias for BEARER_TOKEN
@@ -78,6 +78,22 @@ const envSchema = z.object({
     .default('false')
     .transform(v => v === 'true' || v === '1'),
   EVENT_STORE_TYPE: z.enum(['memory', 'redis']).default('memory'),
+  // v3.0 Enterprise
+  TENANT_REQUIRED: z
+    .string()
+    .default('false')
+    .transform(v => v === 'true' || v === '1'),
+  OIDC_ISSUER: z.string().optional(),
+  OIDC_AUDIENCE: z.string().optional(),
+  CLUSTER_MODE: z
+    .string()
+    .default('false')
+    .transform(v => v === 'true' || v === '1'),
+  CLUSTER_WORKERS: z
+    .string()
+    .default('0')
+    .transform(v => parseInt(v, 10))
+    .pipe(z.number().int().min(0).max(16)),
 });
 
 function parseEnv(
@@ -132,6 +148,8 @@ export const config = {
     mode: env.AUTH_MODE,
     apiKey: env.API_KEY,
     bearerToken: env.BEARER_TOKEN || env.AUTH_TOKEN,
+    oidcIssuer: env.OIDC_ISSUER,
+    oidcAudience: env.OIDC_AUDIENCE,
   },
   rateLimit: {
     windowMs: env.RATE_LIMIT_WINDOW_MS,
@@ -184,6 +202,13 @@ export const config = {
   },
   eventStore: {
     type: env.EVENT_STORE_TYPE,
+  },
+  tenant: {
+    required: env.TENANT_REQUIRED,
+  },
+  cluster: {
+    enabled: env.CLUSTER_MODE,
+    workers: env.CLUSTER_WORKERS,
   },
   // expose raw env for advanced use
   _env: env,

@@ -1,4 +1,4 @@
-# Override for v2.1 OTEL (optional)
+# Override for v2.1 OTEL + v3.0 Prometheus/Grafana (optional)
 # Usage: docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
 services:
   otel-collector:
@@ -18,5 +18,27 @@ services:
       OTEL_ENABLED: "true"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
       ADMIN_ENABLED: "true"
+      # v3.0 enterprise
+      CLUSTER_MODE: "false" # enable for multi-worker scale
     depends_on:
       - otel-collector
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: mcp-prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: mcp-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped

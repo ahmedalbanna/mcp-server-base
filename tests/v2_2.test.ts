@@ -117,7 +117,7 @@ describe('v2.2 Ecosystem & DX', () => {
       expect(pkg.files).toContain('smithery.yaml');
       expect(pkg.bin['mcp-server-base']).toBe('dist/index.js');
       expect(pkg.keywords).toContain('plugin');
-      expect(pkg.version).toBe('2.2.0');
+      expect(pkg.version).toBe('3.0.0');
     });
 
     it('smithery.yaml exists and valid', async () => {
@@ -131,7 +131,7 @@ describe('v2.2 Ecosystem & DX', () => {
     it('server instructions mention 2.2 and plugins', async () => {
       const { server } = await createClient();
       // We can't directly get instructions via MCP, but config version should be 2.2.0
-      expect(config.server.version).toBe('2.2.0');
+      expect(config.server.version).toBe('3.0.0');
     });
   });
 

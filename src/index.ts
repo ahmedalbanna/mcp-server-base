@@ -26,6 +26,9 @@ import {
   httpRequestDuration,
   mcpSessionsActive,
 } from './utils/metrics.js';
+import { registerControlPlaneRoutes } from './routes/controlplane.js';
+import { tenantMiddleware } from './middleware/tenant.js';
+import { initCluster } from './utils/cluster.js';
 
 const args = process.argv.slice(2);
 const useHttp = args.includes('--http') || process.env.TRANSPORT === 'http';
@@ -121,6 +124,9 @@ export function createHttpApp() {
   // RBAC for MCP tools (v2.1)
   app.use('/mcp', mcpRbacMiddleware);
 
+  // Multi-tenant (v3.0): extract X-Tenant-Id, reject if TENANT_REQUIRED and missing
+  app.use('/mcp', tenantMiddleware);
+
   // Health & readiness with SLO checks (v2.1)
   app.get('/health', async (_req, res) => {
     const slo = await checkSlo();
@@ -163,6 +169,7 @@ export function createHttpApp() {
   // Admin routes (protected, before MCP)
   try {
     registerAdminRoutes(app, () => ({ server: createMcpServer(), transports: {} }));
+    registerControlPlaneRoutes(app); // v3.0 tenants CRUD
   } catch (err) {
     logger.warn('Admin routes failed to register', { error: String(err) });
   }
@@ -354,15 +361,23 @@ async function startHttp() {
 
 // Auto-start only when run directly, not when imported (tests)
 if (process.env.NODE_ENV !== 'test') {
-  if (useHttp) {
-    startHttp().catch(err => {
-      logger.error('Failed to start HTTP server', err);
-      process.exit(1);
-    });
-  } else {
-    startStdio().catch(err => {
-      logger.error('Failed to start STDIO server', err);
-      process.exit(1);
-    });
+  const boot = () => {
+    if (useHttp) {
+      startHttp().catch(err => {
+        logger.error('Failed to start HTTP server', err);
+        process.exit(1);
+      });
+    } else {
+      startStdio().catch(err => {
+        logger.error('Failed to start STDIO server', err);
+        process.exit(1);
+      });
+    }
+  };
+  // v3.0: cluster mode — primary forks workers (each boots via startWorker);
+  // when disabled, boot directly in this process
+  const handled = initCluster(boot);
+  if (!handled) {
+    boot();
   }
 }

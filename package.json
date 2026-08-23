@@ -1,7 +1,7 @@
 {
   "name": "mcp-server-base",
-  "version": "2.2.0",
-  "description": "Strong base MCP Server v2.2 Ecosystem & DX - Production ready with plugin SDK, registry, hybrid RAG (2026)",
+  "version": "3.0.0",
+  "description": "Strong base MCP Server v3.0 Scale & Enterprise - multi-tenant, SSO OIDC, control plane (2026)",
   "type": "module",
   "main": "dist/index.js",
   "bin": {

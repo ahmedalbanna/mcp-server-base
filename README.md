@@ -1,12 +1,12 @@
-# MCP Server Base v2.2 — Ecosystem & DX (2026)
+# MCP Server Base v3.0 — Scale & Enterprise (2026)
 
 [![CI](https://github.com/ahmedalbanna/mcp-server-base/actions/workflows/ci.yml/badge.svg)](https://github.com/ahmedalbanna/mcp-server-base/actions/workflows/ci.yml)
 [![Node 20+](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](.nvmrc)
 [![MCP SDK 1.12.1](https://img.shields.io/badge/MCP%20SDK-1.12.1-blue)](https://github.com/modelcontextprotocol/typescript-sdk)
 [![TypeScript 5.7](https://img.shields.io/badge/TypeScript-5.7-3178c6)](https://www.typescriptlang.org/)
 [![License MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Coverage 89%](https://img.shields.io/badge/coverage-89%25-brightgreen)](vitest.config.ts)
-[![Version 2.2.0](https://img.shields.io/badge/version-2.2.0-blue)](package.json)
+[![Coverage 88%](https://img.shields.io/badge/coverage-88%25-brightgreen)](vitest.config.ts)
+[![Version 3.0.0](https://img.shields.io/badge/version-3.0.0-blue)](package.json)
 [![Smithery](https://img.shields.io/badge/Registry-smithery-orange)](smithery.yaml)
 
 Modern **Model Context Protocol** server using the latest stack:
@@ -18,8 +18,9 @@ Modern **Model Context Protocol** server using the latest stack:
 - Dual transport: **STDIO** (Claude Desktop) and **Streamable HTTP** (remote, 2025-03 spec, stateless + stateful resumability via **RedisEventStore**)
 - Structured tool/resource/prompt modules + **RAG hybrid (BM25+vector)**, **Web (cached)**, **GitHub** integrations
 - **Plugin SDK** (`src/plugin/index.ts:1`) + integrations (slack/notion/linear), **Registry** (smithery.yaml, mcpName), **Prompt Playground** at `/admin`
+- **v3.0 Enterprise**: Multi-tenant (`X-Tenant-Id`, namespaced stores), SSO OIDC, Control plane CRUD, cluster mode, Prometheus/Grafana stack
 - **OTEL** tracing/metrics (`src/utils/otel.ts:1`), **Tasks** (experimental + `create_task`), **k6** load tests
-- `tsx` watch, `vitest` (163 tests, 89% coverage), graceful shutdown, `docker-compose` (redis, postgres, qdrant, otel-collector)
+- `tsx` watch, `vitest` (178 tests, 88% coverage), graceful shutdown, `docker-compose` (redis, postgres, qdrant, otel-collector, prometheus, grafana)
 
 ---
 
@@ -223,6 +224,9 @@ src/
 │   ├── rag.tool.ts, web.tool.ts, github.tool.ts, elicitation.tool.ts, sampling.tool.ts, tasks.tool.ts
 ├── plugin/index.ts       # Plugin SDK: definePlugin/registerPlugin (v2.2)
 ├── integrations/         # slack/notion/linear plugins (v2.2)
+├── middleware/tenant.ts  # Multi-tenant X-Tenant-Id + scoped stores (v3.0)
+├── routes/controlplane.ts# Tenants CRUD + key rotation (v3.0)
+├── utils/cluster.ts      # Cluster mode horizontal scale (v3.0)
 ├── resources/            # 6 resources: config, greeting, file, memory, db, docs
 ├── routes/admin.ts       # Admin UI + metrics/spans/stores (v2.0) + /metrics Prometheus (v2.1)
 └── prompts/              # 4 prompts: code-review, explain-concept, summarize, research
@@ -254,7 +258,16 @@ Add a new tool: create `src/tools/my.tool.ts` → export `registerMyTool(server)
 - **Stack** `docker-compose.yml:1` (app + redis:7 + postgres:16 + qdrant:v1.12.4) with healthchecks
 - **Demo** `rag_ingest → rag_search → docs://` E2E verified in `tests/integrations.test.ts:1` (21 tests)
 
-## 🔌 Ecosystem & DX (Phase 5 — v2.2) — NEW
+## 🏢 Scale & Enterprise (Phase 5 — v3.0) — NEW
+
+- **Multi-tenant** `src/middleware/tenant.ts:1` — `X-Tenant-Id` header (or `?tenant=`), `tenantMiddleware` rejects `400` when `TENANT_REQUIRED=true` and missing, tenant-scoped memory `getTenantMemory(tid)` (isolated stores), namespaced cache keys `tenant:{id}:key`, registry `createTenant/deleteTenant`
+- **SSO OIDC** `src/middleware/auth.ts:1` — `AUTH_MODE=oidc`: Bearer JWT structural validation (3-part, `exp`, `iss` vs `OIDC_ISSUER`, `aud` vs `OIDC_AUDIENCE`), claims attached to `req.oidcClaims`; production swaps in JWKS signature verification
+- **Control plane** `src/routes/controlplane.ts:1` — CRUD `/admin/tenants` (`POST/GET/PATCH/DELETE` + 409 dup/400 invalid-id), `POST /admin/tenants/:id/rotate-key`, `GET /admin/tenants/:id/store` isolation inspection; admin-token protected
+- **Runtime scale** `src/utils/cluster.ts:1` — `initCluster()` forks `CLUSTER_WORKERS` (default CPU-1), auto-restart on worker exit, `CLUSTER_MODE=true`; stateless + `RedisEventStore` for true horizontal
+- **Monitoring stack** `docker-compose.override.yml:1` — Prometheus (`prometheus.yml` scrapes `app:3000/metrics`) at :9090 + Grafana at :3001
+- **Tests** `tests/v3_0.test.ts:1` (15 tests: tenant extraction/isolation/required-400, OIDC token validation + issuer/audience + HTTP 401/200, control plane lifecycle 201/409/400/404/rotate-key/store-inspection/disabled-404, cluster no-op, compose services) — total 178
+
+## 🔌 Ecosystem & DX (Phase 5 — v2.2)
 
 - **Plugin SDK** `src/plugin/index.ts:1` — `definePlugin({name, version, register})`, `registerPlugin(server, plugin)` (duplicate-tolerant), `getRegisteredPlugins()`, auto `sendToolListChanged` notifications
 - **Integrations** `src/integrations/` — `slackPlugin` (list/post/search), `notionPlugin` (search/get/create), `linearPlugin` (list/create/get) — all mocked without tokens (`SLACK_TOKEN`, `NOTION_TOKEN`); auto-registered in `src/server.ts:1`
@@ -291,7 +304,7 @@ Add a new tool: create `src/tools/my.tool.ts` → export `registerMyTool(server)
 - Health (`GET /health`) & ready (`GET /ready`) separate from MCP
 - Stateless default (`sessionIdGenerator: undefined`), stateful when `RESUMABILITY_ENABLED=true` (`src/index.ts:22`)
 - Type-safe, strict TS + ESLint flat + Prettier + husky + lint-staged
-- Coverage 85% lines / 70% branches enforced (`vitest.config.ts:1`), 163 tests: unit + e2e HTTP/security/capabilities/integrations/scale/v2.1/v2.2
+- Coverage 85% lines / 70% branches enforced (`vitest.config.ts:1`), 178 tests: unit + e2e HTTP/security/capabilities/integrations/scale/v2.1/v2.2/v3.0
 
 ## 🤝 Contributing
 
