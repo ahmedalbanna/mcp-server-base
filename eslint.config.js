@@ -37,9 +37,31 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/tools/elicitation.tool.ts', 'src/tools/sampling.tool.ts', 'src/tools/database.tool.ts'],
+    files: [
+      'src/tools/elicitation.tool.ts',
+      'src/tools/sampling.tool.ts',
+      'src/tools/database.tool.ts',
+      'src/tools/github.tool.ts',
+      'src/tools/web.tool.ts',
+      'src/tools/rag.tool.ts',
+      'src/tools/tasks.tool.ts',
+      'src/utils/otel.ts',
+      'src/utils/redisEventStore.ts',
+      'src/routes/admin.ts',
+    ],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+  {
+    files: ['k6/**/*.js'],
+    languageOptions: {
+      globals: {
+        __ENV: 'readonly',
+      },
+    },
+    rules: {
+      'no-undef': 'off',
     },
   },
   {

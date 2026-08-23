@@ -1,21 +1,23 @@
-# MCP Server Base — Strong Production Ready (2026)
+# MCP Server Base v2.0 — Scale & Operability (2026)
 
 [![CI](https://github.com/ahmedalbanna/mcp-server-base/actions/workflows/ci.yml/badge.svg)](https://github.com/ahmedalbanna/mcp-server-base/actions/workflows/ci.yml)
-[![Node 22](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](.nvmrc)
+[![Node 20+](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](.nvmrc)
 [![MCP SDK 1.12.1](https://img.shields.io/badge/MCP%20SDK-1.12.1-blue)](https://github.com/modelcontextprotocol/typescript-sdk)
 [![TypeScript 5.7](https://img.shields.io/badge/TypeScript-5.7-3178c6)](https://www.typescriptlang.org/)
 [![License MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Coverage 80%](https://img.shields.io/badge/coverage-80%25-brightgreen)](vitest.config.ts)
+[![Coverage 91%](https://img.shields.io/badge/coverage-91%25-brightgreen)](vitest.config.ts)
+[![Version 2.0.0](https://img.shields.io/badge/version-2.0.0-blue)](package.json)
 
 Modern **Model Context Protocol** server using the latest stack:
 
 - **MCP SDK `1.12+`** — `McpServer` high-level API + `StreamableHTTPServerTransport` (new) & `StdioServerTransport`
 - **TypeScript 5.7 ESM** + `NodeNext` module
 - **Zod** validation → auto JSON Schema + env validation (`src/config.ts:1`)
-- **Express 4** + **helmet** + **CORS allowlist** + **rate-limit** + health/ready
-- Dual transport: **STDIO** (Claude Desktop) and **Streamable HTTP** (remote, 2025-03 spec, stateless + stateful resumability)
+- **Express 4** + **helmet** + **CORS allowlist** + **rate-limit** + health/ready + **Admin UI**
+- Dual transport: **STDIO** (Claude Desktop) and **Streamable HTTP** (remote, 2025-03 spec, stateless + stateful resumability via **RedisEventStore**)
 - Structured tool/resource/prompt modules + **RAG (local vector)**, **Web (cached)**, **GitHub** integrations
-- `tsx` watch, `vitest` (110 tests, 91% coverage), graceful shutdown, `docker-compose` (redis, postgres, qdrant)
+- **OTEL** tracing/metrics (`src/utils/otel.ts:1`), **Tasks** (experimental + `create_task`), **k6** load tests
+- `tsx` watch, `vitest` (130 tests, 91% coverage), graceful shutdown, `docker-compose` (redis, postgres, qdrant)
 
 ---
 
@@ -64,7 +66,7 @@ Streamable HTTP is the **new standard** replacing SSE (deprecated March 2025).
 
 ---
 
-## 🧰 Tools (28)
+## 🧰 Tools (31)
 
 | Tool                     | Description                            | Input                                    |
 | ------------------------ | -------------------------------------- | ---------------------------------------- |
@@ -96,6 +98,9 @@ Streamable HTTP is the **new standard** replacing SSE (deprecated March 2025).
 | `github_search_repos`    | GitHub search repos                    | `query`, `perPage?`                      |
 | `github_get_repo`        | GitHub get repo                        | `repo`                                   |
 | `github_get_issue`       | GitHub get issue                       | `repo`, `issueNumber`                    |
+| `create_task`            | Create background task                 | `duration?`, `payload?`                  |
+| `get_task`               | Get task status                        | `taskId`                                 |
+| `get_task_result`        | Get task result                        | `taskId`                                 |
 
 ## 📦 Resources (6)
 
@@ -195,10 +200,11 @@ src/
 ├── utils/eventStore.ts   # InMemoryEventStore for Last-Event-ID
 ├── utils/cache.ts        # MemoryCache (TTL) + defaultCache
 ├── utils/queue.ts        # SimpleQueue
-├── tools/                # 28 tools: echo, fs, memory, db, shell, rag, web, github, elicitation, sampling
+├── tools/                # 31 tools: echo, fs, memory, db, shell, rag, web, github, elicitation, sampling, tasks
 │   ├── filesystem.tool.ts, memory.tool.ts, database.tool.ts, shell.tool.ts
-│   ├── rag.tool.ts, web.tool.ts, github.tool.ts, elicitation.tool.ts, sampling.tool.ts
+│   ├── rag.tool.ts, web.tool.ts, github.tool.ts, elicitation.tool.ts, sampling.tool.ts, tasks.tool.ts
 ├── resources/            # 6 resources: config, greeting, file, memory, db, docs
+├── routes/admin.ts       # Admin UI + metrics + spans
 └── prompts/              # 4 prompts: code-review, explain-concept, summarize, research
 ```
 
@@ -217,7 +223,7 @@ Add a new tool: create `src/tools/my.tool.ts` → export `registerMyTool(server)
 - **Structured logger** JSON/text, `[REDACTED]` for `authorization`, `apiKey`, `token` (`src/utils/logger.ts:24`)
 - **Resumability** `InMemoryEventStore` (`src/utils/eventStore.ts:1`) + stateful session map when `RESUMABILITY_ENABLED=true` (replay via `Last-Event-ID`, `GET /mcp` stream, `DELETE` close)
 - **Docker hardening** non-root `appuser` + `HEALTHCHECK` (`Dockerfile:1`)
-- Tests: `tests/unit/auth.test.ts`, `tests/unit/logger.test.ts`, `tests/unit/eventStore.test.ts`, `tests/e2e/security.test.ts` (helmet/auth/rateLimit/resumability) — `67 tests → 110 total with Phase 3+4, 91% coverage`
+- Tests: `tests/unit/auth.test.ts`, `tests/unit/logger.test.ts`, `tests/unit/eventStore.test.ts`, `tests/e2e/security.test.ts` (helmet/auth/rateLimit/resumability) — `67 tests → 130 total with Phase 5, 90.89% coverage`
 
 ## 🔗 Integrations (Phase 4)
 
@@ -228,7 +234,17 @@ Add a new tool: create `src/tools/my.tool.ts` → export `registerMyTool(server)
 - **Stack** `docker-compose.yml:1` (app + redis:7 + postgres:16 + qdrant:v1.12.4) with healthchecks
 - **Demo** `rag_ingest → rag_search → docs://` E2E verified in `tests/integrations.test.ts:1` (21 tests)
 
-## 🔐 Best Practices Included
+## 📈 Scale & Operability (Phase 5 — v2.0)
+
+- **Versioned MCP** `v2.0.0` (`package.json:1`, `config.MCP_SERVER_VERSION`) with instructions per minor (`src/server.ts:1`)
+- **OTEL** tracing/metrics (`src/utils/otel.ts:1`) — `createSpan`/`withSpan`, `incrementCounter`/`recordHistogram`, `getMetrics`/`getSpans`, JSON export stub for `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_ENABLED` flag
+- **RedisEventStore** (`src/utils/redisEventStore.ts:1`) — `EventStore` impl with `storeEvent`/`replayEventsAfter`, in-memory fallback, `eventStoreFactory.create()` for horizontal scale (`EVENT_STORE_TYPE=memory|redis`, `REDIS_URL`)
+- **Admin UI** (`src/routes/admin.ts:1`) — `GET /admin` (HTML dashboard), `/admin/tools|resources|prompts|metrics|spans|stores|health` (JSON), protected via `ADMIN_TOKEN` (`X-Admin-Token`), `ADMIN_ENABLED` flag
+- **Tasks** (`src/tools/tasks.tool.ts:1`) — experimental `delay_task` (if SDK tasks available) + fallback `create_task`/`get_task`/`get_task_result` (in-memory, polling), `SimpleQueue`/`MemoryCache` infra
+- **Bench** `k6/load.js:1` — `http_req_duration p(95)<100ms`, `stages` 10→50 VUs, `checks >99%`, `npm run bench` / `bench:local`
+- **Compose** `docker-compose.yml:1` already includes redis/postgres/qdrant for scale
+- Tests: `tests/scale.test.ts:1` (OTEL spans/metrics, RedisEventStore replay, cache TTL, queue, admin HTML/metrics/token/ready, tasks create/poll, version, k6 script) — 130 total
+- **Deploy** ready for Fly.io/Cloud Run (stateless + RedisEventStore), GHCR via `release.yml`, npm `2.0.0`
 
 - Logger stderr-safe, never logs secrets (redaction)
 - Zod → JSON Schema via SDK (`src/types.ts:1`, `src/tools/*.tool.ts`)
@@ -237,7 +253,7 @@ Add a new tool: create `src/tools/my.tool.ts` → export `registerMyTool(server)
 - Health (`GET /health`) & ready (`GET /ready`) separate from MCP
 - Stateless default (`sessionIdGenerator: undefined`), stateful when `RESUMABILITY_ENABLED=true` (`src/index.ts:22`)
 - Type-safe, strict TS + ESLint flat + Prettier + husky + lint-staged
-- Coverage 85% lines / 70% branches enforced (`vitest.config.ts:1`), 110 tests: unit + e2e HTTP/security/capabilities/integrations
+- Coverage 85% lines / 70% branches enforced (`vitest.config.ts:1`), 130 tests: unit + e2e HTTP/security/capabilities/integrations/scale
 
 ## 🤝 Contributing
 

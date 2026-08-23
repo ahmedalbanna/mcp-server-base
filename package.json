@@ -1,7 +1,7 @@
 {
   "name": "mcp-server-base",
-  "version": "1.0.0",
-  "description": "Strong base MCP Server - Production ready with latest tech stack (2026)",
+  "version": "2.0.0",
+  "description": "Strong base MCP Server v2.0 Scale & Operability - Production ready with latest tech stack (2026)",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -23,6 +23,8 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
+    "bench": "k6 run k6/load.js",
+    "bench:local": "BASE_URL=http://localhost:3000 k6 run k6/load.js",
     "prepare": "husky"
   },
   "keywords": [

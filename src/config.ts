@@ -62,6 +62,22 @@ const envSchema = z.object({
     .default('50')
     .transform(v => parseInt(v, 10))
     .pipe(z.number().int().min(0)),
+  // Phase 5
+  OTEL_ENABLED: z
+    .string()
+    .default('false')
+    .transform(v => v === 'true' || v === '1'),
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
+  ADMIN_ENABLED: z
+    .string()
+    .default('true')
+    .transform(v => v === 'true' || v === '1'),
+  ADMIN_TOKEN: z.string().optional(),
+  TASKS_ENABLED: z
+    .string()
+    .default('false')
+    .transform(v => v === 'true' || v === '1'),
+  EVENT_STORE_TYPE: z.enum(['memory', 'redis']).default('memory'),
 });
 
 function parseEnv(
@@ -154,6 +170,20 @@ export const config = {
     openaiApiKey: env.OPENAI_API_KEY,
     githubToken: env.GITHUB_TOKEN,
     qdrantUrl: env.QDRANT_URL,
+  },
+  otel: {
+    enabled: env.OTEL_ENABLED,
+    endpoint: env.OTEL_EXPORTER_OTLP_ENDPOINT,
+  },
+  admin: {
+    enabled: env.ADMIN_ENABLED,
+    token: env.ADMIN_TOKEN,
+  },
+  tasks: {
+    enabled: env.TASKS_ENABLED,
+  },
+  eventStore: {
+    type: env.EVENT_STORE_TYPE,
   },
   // expose raw env for advanced use
   _env: env,

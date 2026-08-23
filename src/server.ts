@@ -9,6 +9,9 @@ export function createMcpServer(): McpServer {
     {
       name: config.server.name,
       version: config.server.version,
+      // v2.0: versioned MCP with instructions per minor
+      title: `${config.server.name} v${config.server.version}`,
+      description: config.server.description,
     },
     {
       capabilities: {
@@ -17,7 +20,16 @@ export function createMcpServer(): McpServer {
         resources: {},
         prompts: {},
       },
-      instructions: `This is ${config.server.name} - a production-ready MCP base server. Use tools like echo, calculator, get_time, fetch_url. Resources at config://server-info and greeting://{name}. Prompts: code-review, explain-concept.`,
+      instructions: `This is ${config.server.name} v${config.server.version} - production-ready MCP base server (v2.0 Scale & Operability).
+
+Capabilities:
+- Tools (28): echo, calculator, get_time, fetch_url, filesystem (list/read/write/search), memory (set/get/delete/list/clear), database (query/tables), shell (allowlist), rag (ingest/search/list/clear), web (brave/tavily/fetch cached), github (search/repo/issue), elicitation, sampling, tasks (create/get/result)
+- Resources (6): config://server-info, greeting://{name}, file:///{+path}, memory://{key}, db://{table}/{id}, docs://{id}
+- Prompts (4): code-review, explain-concept, summarize, research
+- Security: helmet, CORS, auth (none/apiKey/bearer), rateLimit, requestId
+- Operability: OTEL tracing (${config.otel.enabled ? 'enabled' : 'disabled'}), admin at /admin, resumability ${config.resumability.enabled ? 'enabled' : 'stateless'}, eventStore ${config.eventStore.type}, cache (memory/redis)
+
+Use tools with Zod validation. For filesystem, stay under ALLOWED_ROOT=${config.fs.allowedRoot}. For RAG, ingest then search. For web/github, cached. Admin at /admin (token: ${config.admin.token ? 'protected' : 'open'}).`,
     }
   );
 
