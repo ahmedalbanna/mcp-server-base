@@ -14,8 +14,8 @@ Modern **Model Context Protocol** server using the latest stack:
 - **Zod** validation → auto JSON Schema + env validation (`src/config.ts:1`)
 - **Express 4** + **helmet** + **CORS allowlist** + **rate-limit** + health/ready
 - Dual transport: **STDIO** (Claude Desktop) and **Streamable HTTP** (remote, 2025-03 spec, stateless + stateful resumability)
-- Structured tool/resource/prompt modules
-- `tsx` watch, `vitest` (67 tests, 98% coverage), graceful shutdown
+- Structured tool/resource/prompt modules + **RAG (local vector)**, **Web (cached)**, **GitHub** integrations
+- `tsx` watch, `vitest` (110 tests, 91% coverage), graceful shutdown, `docker-compose` (redis, postgres, qdrant)
 
 ---
 
@@ -64,36 +64,47 @@ Streamable HTTP is the **new standard** replacing SSE (deprecated March 2025).
 
 ---
 
-## 🧰 Tools (18)
+## 🧰 Tools (28)
 
-| Tool                     | Description                            | Input                           |
-| ------------------------ | -------------------------------------- | ------------------------------- |
-| `echo`                   | Echo message                           | `message`, `uppercase?`         |
-| `calculator`             | add/sub/mul/div                        | `operation`, `a`, `b`           |
-| `get_time`               | Current time                           | `timezone?`                     |
-| `fetch_url`              | Fetch URL                              | `url`, `maxLength?`             |
-| `list_files`             | List files under ALLOWED_ROOT          | `path?`, `recursive?`           |
-| `read_file`              | Read file (1MB limit)                  | `path`                          |
-| `write_file`             | Write file + triggers resource changed | `path`, `content`               |
-| `search_files`           | Search text inside files               | `query`, `path?`, `maxResults?` |
-| `memory_set`             | Set KV in memory                       | `key`, `value`                  |
-| `memory_get`             | Get KV                                 | `key`                           |
-| `memory_delete`          | Delete KV                              | `key`                           |
-| `memory_list`            | List KVs                               | —                               |
-| `memory_clear`           | Clear all                              | —                               |
-| `database_query`         | SQL via alasql (users, notes)          | `sql`                           |
-| `database_tables`        | List tables row counts                 | —                               |
-| `shell_execute`          | Shell (allowlist, disabled by default) | `command`, `timeout?`           |
-| `collect_user_info`      | Elicitation demo (contact/preferences) | `infoType?`                     |
-| `generate_with_sampling` | Sampling demo (LLM)                    | `prompt`, `maxTokens?`          |
+| Tool                     | Description                            | Input                                    |
+| ------------------------ | -------------------------------------- | ---------------------------------------- |
+| `echo`                   | Echo message                           | `message`, `uppercase?`                  |
+| `calculator`             | add/sub/mul/div                        | `operation`, `a`, `b`                    |
+| `get_time`               | Current time                           | `timezone?`                              |
+| `fetch_url`              | Fetch URL                              | `url`, `maxLength?`                      |
+| `list_files`             | List files under ALLOWED_ROOT          | `path?`, `recursive?`                    |
+| `read_file`              | Read file (1MB limit)                  | `path`                                   |
+| `write_file`             | Write file + triggers resource changed | `path`, `content`                        |
+| `search_files`           | Search text inside files               | `query`, `path?`, `maxResults?`          |
+| `memory_set`             | Set KV in memory                       | `key`, `value`                           |
+| `memory_get`             | Get KV                                 | `key`                                    |
+| `memory_delete`          | Delete KV                              | `key`                                    |
+| `memory_list`            | List KVs                               | —                                        |
+| `memory_clear`           | Clear all                              | —                                        |
+| `database_query`         | SQL via alasql (users, notes)          | `sql`                                    |
+| `database_tables`        | List tables row counts                 | —                                        |
+| `shell_execute`          | Shell (allowlist, disabled by default) | `command`, `timeout?`                    |
+| `collect_user_info`      | Elicitation demo (contact/preferences) | `infoType?`                              |
+| `generate_with_sampling` | Sampling demo (LLM)                    | `prompt`, `maxTokens?`                   |
+| `rag_ingest`             | Ingest text (chunked, embedded)        | `text`, `id?`, `metadata?`, `chunk?`     |
+| `rag_search`             | Vector search (cosine)                 | `query`, `topK?`, `threshold?`           |
+| `rag_list`               | List docs                              | —                                        |
+| `rag_clear`              | Clear vector store                     | —                                        |
+| `brave_search`           | Brave API (mock if no key)             | `query`, `count?`                        |
+| `tavily_search`          | Tavily API (mock if no key)            | `query`, `maxResults?`, `includeAnswer?` |
+| `web_fetch`              | Cached web fetch                       | `url`, `useCache?`, `maxLength?`         |
+| `github_search_repos`    | GitHub search repos                    | `query`, `perPage?`                      |
+| `github_get_repo`        | GitHub get repo                        | `repo`                                   |
+| `github_get_issue`       | GitHub get issue                       | `repo`, `issueNumber`                    |
 
-## 📦 Resources (5)
+## 📦 Resources (6)
 
 - `config://server-info` — server metadata (JSON, now includes `features`)
 - `greeting://{name}` — dynamic greeting template
 - `file:///{+path}` — sandboxed file (`ALLOWED_ROOT`), list + complete, `file:///notes.txt`
 - `memory://{key}` — memory KV, list + complete
 - `db://{table}/{id}` — demo DB row (users/notes), list + complete
+- `docs://{id}` — RAG chunk (ingested via `rag_ingest`), list + complete
 
 ## 💬 Prompts (4)
 
@@ -143,10 +154,28 @@ npx @modelcontextprotocol/inspector http://localhost:3000/mcp
 
 ## 🐳 Docker
 
-```dockerfile
-# See Dockerfile
+```bash
+# Single container
 docker build -t mcp-server-base .
 docker run -p 3000:3000 --env TRANSPORT=http mcp-server-base
+
+# Full stack (app + redis + postgres + qdrant) — see docker-compose.yml
+docker compose up -d
+docker compose logs -f app
+# → http://localhost:3000/health, http://localhost:3000/mcp
+# → redis :6379, postgres :5432, qdrant :6333
+```
+
+### RAG Demo (ingest → search → docs://)
+
+```bash
+# via MCP tools (Inspector or Client)
+# 1. ingest
+rag_ingest { "text": "MCP is Model Context Protocol...", "id": "mcp-intro" }
+# 2. search
+rag_search { "query": "what is MCP?", "topK": 3 }
+# 3. read resource
+# docs://mcp-intro  → returns ingested text
 ```
 
 ---
@@ -157,23 +186,27 @@ docker run -p 3000:3000 --env TRANSPORT=http mcp-server-base
 src/
 ├── index.ts              # entry: stdio + http (helmet/cors/rateLimit/auth/resumability)
 ├── server.ts             # createMcpServer() factory
-├── config.ts             # zod env validation (AUTH_MODE, CORS, rateLimit, resumability)
+├── config.ts             # zod env (AUTH, CORS, rateLimit, RAG, cache, integrations)
 ├── types.ts              # Zod schemas
 ├── middleware/auth.ts    # AUTH_MODE none|apiKey|bearer
 ├── middleware/rateLimit.ts
 ├── middleware/requestId.ts
 ├── utils/logger.ts       # stderr, JSON/text, redaction, child(requestId)
 ├── utils/eventStore.ts   # InMemoryEventStore for Last-Event-ID
-├── tools/                # registerAllTools()
-├── resources/            # registerAllResources()
-└── prompts/              # registerAllPrompts()
+├── utils/cache.ts        # MemoryCache (TTL) + defaultCache
+├── utils/queue.ts        # SimpleQueue
+├── tools/                # 28 tools: echo, fs, memory, db, shell, rag, web, github, elicitation, sampling
+│   ├── filesystem.tool.ts, memory.tool.ts, database.tool.ts, shell.tool.ts
+│   ├── rag.tool.ts, web.tool.ts, github.tool.ts, elicitation.tool.ts, sampling.tool.ts
+├── resources/            # 6 resources: config, greeting, file, memory, db, docs
+└── prompts/              # 4 prompts: code-review, explain-concept, summarize, research
 ```
 
 Add a new tool: create `src/tools/my.tool.ts` → export `registerMyTool(server)` → add to `src/tools/index.ts`.
 
 ---
 
-## 🔐 Security (Phase 2) — New
+## 🔐 Security (Phase 2)
 
 - **Helmet** headers (`x-dns-prefetch-control`, `x-frame-options`, `x-content-type-options`, etc.) via `helmet@7` (`src/index.ts:1`)
 - **CORS allowlist** (`CORS_ORIGIN=*` or comma list) with `cors` credentials handling (`src/config.ts:60`)
@@ -184,7 +217,16 @@ Add a new tool: create `src/tools/my.tool.ts` → export `registerMyTool(server)
 - **Structured logger** JSON/text, `[REDACTED]` for `authorization`, `apiKey`, `token` (`src/utils/logger.ts:24`)
 - **Resumability** `InMemoryEventStore` (`src/utils/eventStore.ts:1`) + stateful session map when `RESUMABILITY_ENABLED=true` (replay via `Last-Event-ID`, `GET /mcp` stream, `DELETE` close)
 - **Docker hardening** non-root `appuser` + `HEALTHCHECK` (`Dockerfile:1`)
-- Tests: `tests/unit/auth.test.ts`, `tests/unit/logger.test.ts`, `tests/unit/eventStore.test.ts`, `tests/e2e/security.test.ts` (helmet/auth/rateLimit/resumability) — `67 tests, 98% coverage`
+- Tests: `tests/unit/auth.test.ts`, `tests/unit/logger.test.ts`, `tests/unit/eventStore.test.ts`, `tests/e2e/security.test.ts` (helmet/auth/rateLimit/resumability) — `67 tests → 110 total with Phase 3+4, 91% coverage`
+
+## 🔗 Integrations (Phase 4)
+
+- **Cache** `MemoryCache` TTL (`src/utils/cache.ts:1`) — `defaultCache` for web/github, `SimpleQueue` (`src/utils/queue.ts:1`)
+- **RAG** local vector (hash embedding 128-dim, cosine, chunk 500/50) at `src/tools/rag.tool.ts:1` — `rag_ingest` (chunked + `sendResourceListChanged`), `rag_search` (topK, threshold), `rag_list`, `rag_clear` + `docs://{id}` resource
+- **Web** `src/tools/web.tool.ts:1` — `brave_search` (mock if no `BRAVE_API_KEY`), `tavily_search` (mock), `web_fetch` (cached via `defaultCache`, `CACHE_TTL_MS`)
+- **GitHub** `src/tools/github.tool.ts:1` — `github_search_repos`, `github_get_repo`, `github_get_issue` (cached, `GITHUB_TOKEN` for rate limit)
+- **Stack** `docker-compose.yml:1` (app + redis:7 + postgres:16 + qdrant:v1.12.4) with healthchecks
+- **Demo** `rag_ingest → rag_search → docs://` E2E verified in `tests/integrations.test.ts:1` (21 tests)
 
 ## 🔐 Best Practices Included
 
@@ -195,7 +237,7 @@ Add a new tool: create `src/tools/my.tool.ts` → export `registerMyTool(server)
 - Health (`GET /health`) & ready (`GET /ready`) separate from MCP
 - Stateless default (`sessionIdGenerator: undefined`), stateful when `RESUMABILITY_ENABLED=true` (`src/index.ts:22`)
 - Type-safe, strict TS + ESLint flat + Prettier + husky + lint-staged
-- Coverage 80% enforced (`vitest.config.ts:1`), E2E HTTP + security tests (`tests/e2e/*.test.ts:1`)
+- Coverage 85% lines / 70% branches enforced (`vitest.config.ts:1`), 110 tests: unit + e2e HTTP/security/capabilities/integrations
 
 ## 🤝 Contributing
 

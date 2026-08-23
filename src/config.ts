@@ -40,6 +40,28 @@ const envSchema = z.object({
     .transform(v => v === 'true' || v === '1'),
   SHELL_ALLOWLIST: z.string().default('ls,cat,echo,pwd,head,tail,grep'),
   DATABASE_PATH: z.string().default(':memory:'),
+  // Phase 4
+  BRAVE_API_KEY: z.string().optional(),
+  TAVILY_API_KEY: z.string().optional(),
+  OPENAI_API_KEY: z.string().optional(),
+  GITHUB_TOKEN: z.string().optional(),
+  REDIS_URL: z.string().optional(),
+  QDRANT_URL: z.string().optional(),
+  CACHE_TTL_MS: z
+    .string()
+    .default('300000')
+    .transform(v => parseInt(v, 10))
+    .pipe(z.number().int().positive()),
+  RAG_CHUNK_SIZE: z
+    .string()
+    .default('500')
+    .transform(v => parseInt(v, 10))
+    .pipe(z.number().int().positive()),
+  RAG_CHUNK_OVERLAP: z
+    .string()
+    .default('50')
+    .transform(v => parseInt(v, 10))
+    .pipe(z.number().int().min(0)),
 });
 
 function parseEnv(
@@ -117,6 +139,21 @@ export const config = {
   },
   database: {
     path: env.DATABASE_PATH,
+  },
+  rag: {
+    chunkSize: env.RAG_CHUNK_SIZE,
+    chunkOverlap: env.RAG_CHUNK_OVERLAP,
+  },
+  cache: {
+    ttlMs: env.CACHE_TTL_MS,
+    redisUrl: env.REDIS_URL,
+  },
+  integrations: {
+    braveApiKey: env.BRAVE_API_KEY,
+    tavilyApiKey: env.TAVILY_API_KEY,
+    openaiApiKey: env.OPENAI_API_KEY,
+    githubToken: env.GITHUB_TOKEN,
+    qdrantUrl: env.QDRANT_URL,
   },
   // expose raw env for advanced use
   _env: env,

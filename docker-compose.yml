@@ -1,0 +1,87 @@
+services:
+  app:
+    build: .
+    container_name: mcp-server-base
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      TRANSPORT: http
+      PORT: 3000
+      HOST: 0.0.0.0
+      LOG_LEVEL: info
+      LOG_FORMAT: json
+      AUTH_MODE: none
+      CORS_ORIGIN: "*"
+      RATE_LIMIT_MAX: 200
+      RESUMABILITY_ENABLED: "false"
+      ALLOWED_ROOT: /data/mcp
+      ALLOW_SHELL: "false"
+      REDIS_URL: redis://redis:6379
+      QDRANT_URL: http://qdrant:6333
+      # Optional integrations (set via .env)
+      # BRAVE_API_KEY: ${BRAVE_API_KEY}
+      # TAVILY_API_KEY: ${TAVILY_API_KEY}
+      # OPENAI_API_KEY: ${OPENAI_API_KEY}
+      # GITHUB_TOKEN: ${GITHUB_TOKEN}
+    volumes:
+      - mcp_data:/data/mcp
+    depends_on:
+      - redis
+      - postgres
+      - qdrant
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: mcp-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: mcp-postgres
+    environment:
+      POSTGRES_USER: mcp
+      POSTGRES_PASSWORD: mcp
+      POSTGRES_DB: mcp
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mcp"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.4
+    container_name: mcp-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+
+volumes:
+  mcp_data:
+  redis_data:
+  pg_data:
+  qdrant_data:

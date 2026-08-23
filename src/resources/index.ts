@@ -249,4 +249,65 @@ export function registerAllResources(server: McpServer) {
       }
     }
   );
+
+  // RAG docs resource: docs://{id}
+  server.registerResource(
+    'docs',
+    new ResourceTemplate('docs://{id}', {
+      list: async () => {
+        try {
+          const { getVectorStore } = await import('../tools/rag.tool.js');
+          const store = getVectorStore();
+          const resources = [...store.entries()].map(([id, doc]) => ({
+            uri: `docs://${id}`,
+            name: id,
+            mimeType: 'text/plain',
+            description: `RAG chunk: ${doc.text.slice(0, 60)}...`,
+          }));
+          return { resources };
+        } catch {
+          return { resources: [] };
+        }
+      },
+      complete: {
+        id: async (value: string) => {
+          try {
+            const { getVectorStore } = await import('../tools/rag.tool.js');
+            return [...getVectorStore().keys()].filter(k => k.startsWith(value)).slice(0, 10);
+          } catch {
+            return [];
+          }
+        },
+      },
+    }),
+    {
+      title: 'RAG Document',
+      description: 'Chunk from vector store (ingested via rag_ingest)',
+      mimeType: 'text/plain',
+    },
+    async (uri, variables) => {
+      const id = (variables as any).id as string;
+      try {
+        const { getVectorStore } = await import('../tools/rag.tool.js');
+        const doc = getVectorStore().get(id);
+        if (!doc) {
+          return {
+            contents: [{ uri: uri.href, mimeType: 'text/plain', text: `Doc "${id}" not found` }],
+          };
+        }
+        return {
+          contents: [
+            {
+              uri: uri.href,
+              mimeType: 'text/plain',
+              text: doc.text,
+            },
+          ],
+        };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { contents: [{ uri: uri.href, mimeType: 'text/plain', text: `Error: ${msg}` }] };
+      }
+    }
+  );
 }

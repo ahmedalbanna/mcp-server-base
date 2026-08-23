@@ -7,6 +7,9 @@ import { registerDatabaseTools } from './database.tool.js';
 import { registerShellTool } from './shell.tool.js';
 import { registerElicitationTool } from './elicitation.tool.js';
 import { registerSamplingTool } from './sampling.tool.js';
+import { registerRagTools } from './rag.tool.js';
+import { registerWebTools } from './web.tool.js';
+import { registerGithubTools } from './github.tool.js';
 
 export function registerAllTools(server: McpServer) {
   // Phase 1 core
@@ -21,4 +24,8 @@ export function registerAllTools(server: McpServer) {
   registerShellTool(server);
   registerElicitationTool(server);
   registerSamplingTool(server);
+  // Phase 4 integrations
+  registerRagTools(server);
+  registerWebTools(server);
+  registerGithubTools(server);
 }
