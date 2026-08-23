@@ -2,9 +2,13 @@
 
 > Strong base MCP Server (2026) — `ahmedalbanna/mcp-server-base`
 > SDK: `@modelcontextprotocol/sdk@1.12.1` | Spec: 2025-03 (Streamable HTTP) | Runtime: Node 22 + TypeScript 5.7 ESM
+>
+> **✅ COMPLETE through v3.0** — this file covers v1.0→v2.0; continuation phases (v2.1 Hardening, v2.2 Ecosystem, v3.0 Enterprise) are tracked in [`ROADMAP_NEXT.md`](ROADMAP_NEXT.md) and are **all shipped** (final: `v3.0.0` `67184ce`, 178 tests).
 
 ## Vision
+
 Production-ready, modular MCP server template that works as:
+
 1. **Local STDIO** server for Claude Desktop / Cursor / opencode
 2. **Remote Streamable HTTP** server for cloud, Docker, and multi-client
 3. **Extensible base** for domain servers (RAG, DB, filesystem, browser, SaaS integrations)
@@ -17,16 +21,16 @@ Principles: spec-compliant, stdio-safe, type-safe (Zod), observable, secure by d
 
 **Tag:** `062851f` on `main` | **Repo:** https://github.com/ahmedalbanna/mcp-server-base
 
-| Area | Status |
-|------|--------|
-| Transports | `StdioServerTransport` + `StreamableHTTPServerTransport` (dual, `src/index.ts:1`) |
-| Server factory | `createMcpServer()` at `src/server.ts:1` |
-| Tools (4) | `echo`, `calculator`, `get_time`, `fetch_url` — Zod validation, `src/tools/` |
-| Resources (2) | `config://server-info`, `greeting://{name}` via `ResourceTemplate` (`src/resources/index.ts:4`) |
-| Prompts (2) | `code-review`, `explain-concept` (`src/prompts/index.ts:1`) |
-| HTTP | Express 4, CORS, `/health`, `/mcp` POST/GET/DELETE, sessionId `randomUUID()` |
-| DX | `tsx watch`, `tsc` build, `vitest` 5 tests (InMemoryTransport), `Dockerfile` node:22-alpine |
-| Safety | stderr logger, fetch 10s timeout, SIGINT/SIGTERM graceful shutdown |
+| Area           | Status                                                                                          |
+| -------------- | ----------------------------------------------------------------------------------------------- |
+| Transports     | `StdioServerTransport` + `StreamableHTTPServerTransport` (dual, `src/index.ts:1`)               |
+| Server factory | `createMcpServer()` at `src/server.ts:1`                                                        |
+| Tools (4)      | `echo`, `calculator`, `get_time`, `fetch_url` — Zod validation, `src/tools/`                    |
+| Resources (2)  | `config://server-info`, `greeting://{name}` via `ResourceTemplate` (`src/resources/index.ts:4`) |
+| Prompts (2)    | `code-review`, `explain-concept` (`src/prompts/index.ts:1`)                                     |
+| HTTP           | Express 4, CORS, `/health`, `/mcp` POST/GET/DELETE, sessionId `randomUUID()`                    |
+| DX             | `tsx watch`, `tsc` build, `vitest` 5 tests (InMemoryTransport), `Dockerfile` node:22-alpine     |
+| Safety         | stderr logger, fetch 10s timeout, SIGINT/SIGTERM graceful shutdown                              |
 
 ---
 
@@ -66,16 +70,19 @@ v1.0.0 (now) ──► v1.1 Hardening ──► v1.2 Security ──► v1.3 Cap
 **Goal:** Reference implementations for most common MCP patterns.
 
 **Tools:**
+
 - [ ] `filesystem` — `list_files`, `read_file`, `write_file`, `search` (sandboxed to `ALLOWED_ROOT`)
 - [ ] `shell` (optional, disabled by default) — allowlist commands
 - [ ] `database` — `query` via `sqlite` (better-sqlite3) / `pg`, prepared statements
 - [ ] `memory` — in-memory key/value + `notifications/tools/list_changed` demo
 
 **Resources:**
+
 - [ ] `file://` + `db://` `ResourceTemplate` with `list` + `complete` callbacks
 - [ ] `notifications/resources/list_changed` on file watch
 
 **Prompts & Sampling:**
+
 - [ ] `summarize`, `research` prompts with `argsSchema` at `src/prompts/index.ts:1`
 - [ ] Elicitation example (`extra.sendRequest('elicitation/create')`) + `sampling/createMessage` passthrough
 
@@ -86,18 +93,22 @@ v1.0.0 (now) ──► v1.1 Hardening ──► v1.2 Security ──► v1.3 Cap
 Pick 2-3 based on domain. Template branches:
 
 **A. RAG / Knowledge:**
+
 - [ ] `src/tools/rag.tool.ts` — `ingest`, `search` via `pgvector` / `qdrant` / `sqlite-vec`
 - [ ] `src/resources/docs://` — chunked resource provider
 - [ ] Embedding adapter (`openai`, `cohere`)
 
 **B. Web / SaaS:**
+
 - [ ] `brave_search`, `tavily_search`, `fetch` with caching (Redis)
 - [ ] `github`, `slack`, `notion` OAuth tool packs (separate `src/integrations/`)
 
 **C. Browser / Automation:**
+
 - [ ] `playwright` tool: `navigate`, `screenshot`, `act`
 
 **Infra:**
+
 - [ ] `src/utils/cache.ts` (Redis / memory), `src/utils/queue.ts`
 - [ ] `docker-compose.yml`: app + redis + postgres + qdrant
 - **Exit criteria:** One end-to-end RAG demo: `ingest` → `search` → prompt uses resource.
@@ -117,14 +128,14 @@ Pick 2-3 based on domain. Template branches:
 
 ## Tech Decisions (ADR)
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Transport | Streamable HTTP (2025-03) only, SSE deprecated | Spec requirement; single `/mcp` endpoint |
-| Server API | `McpServer` high-level (not low-level `Server`) | Zod auto-schema, simpler `registerTool/Resource/Prompt` |
-| TS | `NodeNext` ESM, `ES2022` | Native ESM in SDK 1.12, future-proof |
-| HTTP framework | Express 4 (via SDK `createMcpExpressApp` in v2) | Mature, SDK examples use it |
-| Validation | `zod@3.23` + `zod-to-json-schema` | Single source of truth |
-| Test | `vitest` + `InMemoryTransport` | Fast, no network, matches SDK tests |
+| Decision       | Choice                                          | Rationale                                               |
+| -------------- | ----------------------------------------------- | ------------------------------------------------------- |
+| Transport      | Streamable HTTP (2025-03) only, SSE deprecated  | Spec requirement; single `/mcp` endpoint                |
+| Server API     | `McpServer` high-level (not low-level `Server`) | Zod auto-schema, simpler `registerTool/Resource/Prompt` |
+| TS             | `NodeNext` ESM, `ES2022`                        | Native ESM in SDK 1.12, future-proof                    |
+| HTTP framework | Express 4 (via SDK `createMcpExpressApp` in v2) | Mature, SDK examples use it                             |
+| Validation     | `zod@3.23` + `zod-to-json-schema`               | Single source of truth                                  |
+| Test           | `vitest` + `InMemoryTransport`                  | Fast, no network, matches SDK tests                     |
 
 ## Release Process
 
@@ -145,4 +156,5 @@ Add a tool: `src/tools/my.tool.ts` → `export function registerMyTool(server: M
 - Repo: https://github.com/ahmedalbanna/mcp-server-base
 
 ---
-*Last updated: 2026-08-23 — Maintainer: Ahmed Al-Banna (@ahmedalbanna)*
+
+_Last updated: 2026-08-23 — Maintainer: Ahmed Al-Banna (@ahmedalbanna)_

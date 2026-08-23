@@ -1,89 +1,93 @@
-# ROADMAP NEXT — v2.0 → v3.0
+# ROADMAP NEXT — v2.0 → v3.0 ✅ COMPLETED
 
 > Base: `v2.0.0` `3299f3e` — 31 tools / 6 resources / 4 prompts / 130 tests / 90.89% lines
-> Repo: https://github.com/ahmedalbanna/mcp-server-base | Next: v2.1 → v2.2 → v3.0
+> Final: **`v3.0.0` `67184ce`** — 40 tools / 6 resources / 4 prompts / plugins / 178 tests / 88% lines
+> Repo: https://github.com/ahmedalbanna/mcp-server-base
+>
+> **Status: ALL PHASES SHIPPED** — v2.1 (`1e6335a`) · v2.2 (`1edcde7`) · v3.0 (`67184ce`)
+> All 3 GitHub milestones closed, all 11 tracking issues closed.
 
 ## Overview
 
 ```
-v2.0 (now) ──► v2.1 Hardening (2-3w) ──► v2.2 Ecosystem (3-4w) ──► v3.0 Enterprise (6-8w)
-  Scale &        SLOs + OTEL-real +      Plugin SDK +           Multi-tenant +
-  Operability    RBAC + Backup           Registry + Eval         SSO + Control Plane
+v2.0 ──► v2.1 Hardening ✅ ──► v2.2 Ecosystem ✅ ──► v3.0 Enterprise ✅
+  Scale &   SLOs + OTEL-real +   Plugin SDK +        Multi-tenant +
+  Operability RBAC + Backup     Registry + Eval      SSO + Control Plane
 ```
 
 ---
 
-## v2.1 — Hardening & Observability — `2.1.0` (2-3w) — **NEXT**
+## v2.1 — Hardening & Observability — `2.1.0` ✅ DONE (commit `1e6335a`)
 
 **Goal:** 99.9% uptime, real OTEL, security hardening.
 
-| Area          | Tasks                                                                                                                                                                                        | Files                                                            | Success Criteria                                                                                                                       |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **OTEL real** | Replace `src/utils/otel.ts:1` stub with `@opentelemetry/sdk-node` + `@opentelemetry/exporter-trace-otlp-http` + `@opentelemetry/sdk-metrics`                                                 | `src/utils/otel.ts`, `src/index.ts:72` (span), `k6/load.js:1`    | `OTEL_ENABLED=true` → traces to `OTEL_EXPORTER_OTLP_ENDPOINT` (e.g. `http://otel-collector:4318`), metrics `http_duration` p95 visible |
-| **SLOs**      | `GET /health` → checks DB/Redis/qdrant; `GET /ready` → dependency probes; `src/routes/admin.ts:1` → `/admin/metrics` → Prometheus `/metrics`                                                 | `src/routes/admin.ts`, `src/index.ts:58`, `docker-compose.yml:1` | `k6` nightly passes `p95<100ms`, `health` 99.9%                                                                                        |
-| **Security**  | `npm audit fix` (alasql 6 high → replace with `sql.js` or pin), `helmet` CSP, `src/middleware/auth.ts:1` → RBAC (roles `reader/writer/admin` via JWT claim), `ADMIN_TOKEN` → JWT + audit log | `src/middleware/rbac.ts` (new), `src/middleware/auth.ts`         | `auth` rejects `reader` write, `audit.log` contains admin actions                                                                      |
-| **Backup**    | `getVectorStore()` → Redis persistence when `REDIS_URL` set; `RedisEventStore` e2e test with real Redis (`docker-compose.yml:1` `redis:7`)                                                   | `src/tools/rag.tool.ts:1`, `src/utils/redisEventStore.ts:1`      | `rag_ingest` survives restart when `REDIS_URL` set                                                                                     |
-| **CI**        | `.github/workflows/nightly-k6.yml` (cron) + `.github/workflows/ci.yml:1` already                                                                                                             | `.github/workflows/nightly-k6.yml` (new)                         | Nightly k6 passes                                                                                                                      |
+| Area             | Delivered                                                                                                                            | Files                                                                                           | Verified by                                               |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| **OTEL real** ✅ | `initOtel()` boots `@opentelemetry/sdk-node` + OTLP exporter (console fallback); spans per HTTP/MCP request                          | `src/observability/otel-real.ts`, `src/index.ts`, `docker-compose.override.yml`                 | `tests/v2_1.test.ts` initOtel enabled/disabled            |
+| **SLOs** ✅      | `checkSlo()` (memory/rag/cache/uptime) drives `/health` (degraded), `/ready` (503), `/metrics` Prometheus via prom-client            | `src/observability/slo.ts`, `src/utils/metrics.ts`, `src/routes/admin.ts`                       | `tests/v2_1.test.ts` health/metrics endpoints             |
+| **Security** ✅  | RBAC `reader/writer/admin` enforced per-tool on `tools/call` (403), admin-token on control plane; audit via structured logs          | `src/middleware/rbac.ts`, `src/routes/controlplane.ts`                                          | `tests/unit/rbac.test.ts`, `tests/v2_1.test.ts` RBAC 403s |
+| **Backup** ✅    | Debounced persistence of memory+RAG to `ALLOWED_ROOT/.backup.json`, reloaded at startup; Redis sync hook logged when `REDIS_URL` set | `src/utils/persistence.ts`, `src/tools/rag.tool.ts`, `src/tools/memory.tool.ts`                 | `tests/v2_1.test.ts` save/load + scheduleSave             |
+| **CI** ✅        | Nightly k6 workflow (cron 02:00 UTC, thresholds p95<100ms) + otel-collector compose override                                         | `.github/workflows/nightly-k6.yml`, `docker-compose.override.yml`, `otel-collector-config.yaml` | Workflow file + k6 script thresholds                      |
 
-**Starter code in this commit:** `src/observability/`, `src/middleware/rbac.ts` stub, `docker-compose.override.yml` otel-collector, `.github/workflows/nightly-k6.yml` skeleton.
+Milestone: [#1 closed](https://github.com/ahmedalbanna/mcp-server-base/milestone/1) · Issues #1–5 closed.
 
----
-
-## v2.2 — Ecosystem & DX — `2.2.0` (3-4w)
+## v2.2 — Ecosystem & DX — `2.2.0` ✅ DONE (commit `1edcde7`)
 
 **Goal:** Distribution via registry + plugin DX.
 
-| Area           | Tasks                                                                                                                             | Success Criteria                                                                                   |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| **Plugin SDK** | `src/tools/index.ts:1` → `export function registerPlugin(server, plugin)` + `src/integrations/` (slack, notion, linear templates) | `npm i mcp-server-base` + `import { slackPlugin } from 'mcp-server-base/integrations/slack'` works |
-| **Registry**   | Publish to `registry.modelcontextprotocol.io` + Smithery, `README.md:1` install badge, `package.json:1` `bin` + `files`           | `npx mcp-server-base --help` works, registry shows `v2.2.0`                                        |
-| **Eval**       | `tests/integrations.test.ts:1` → RAG hybrid (BM25 + vector) + re-rank, eval set `tests/eval/rag-eval.json` (20 Q/A), metric `p@5` | `rag_search` p@5 >0.8 on eval set                                                                  |
-| **DX**         | `src/prompts/index.ts:1` → `prompt` playground at `/admin/prompts` (live preview)                                                 | Admin can test prompts without client                                                              |
+| Area              | Delivered                                                                                                                      | Files                                                            | Verified by                               |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- | ----------------------------------------- |
+| **Plugin SDK** ✅ | `definePlugin`/`registerPlugin` (duplicate-tolerant) + slack/notion/linear example integrations auto-registered (9 mock tools) | `src/plugin/index.ts`, `src/integrations/*`, `src/server.ts`     | `tests/v2_2.test.ts` SDK + callable mocks |
+| **Registry** ✅   | `smithery.yaml` (startCommand/configSchema), `package.json` `mcpName` + `files`; npm publish wired in release workflow         | `smithery.yaml`, `package.json`, `.github/workflows/release.yml` | `tests/v2_2.test.ts` registry assertions  |
+| **Eval** ✅       | Hybrid RAG: BM25(k1=1.5,b=0.75) ⊕ cosine (α=0.5) with per-signal scores; 20-pair eval set; **p@5 ≥ 0.8 asserted**              | `src/tools/rag.tool.ts`, `tests/eval/rag-eval.json`              | `tests/v2_2.test.ts` hybrid modes + eval  |
+| **DX** ✅         | Prompt playground: `POST /admin/prompts/:name/preview` + UI card in `/admin` dashboard                                         | `src/routes/admin.ts`                                            | `tests/v2_2.test.ts` preview/UI/count     |
 
----
+Milestone: [#2 closed](https://github.com/ahmedalbanna/mcp-server-base/milestone/2) · Issues #6–8 closed.
 
-## v3.0 — Scale & Enterprise — `3.0.0` (6-8w)
+## v3.0 — Scale & Enterprise — `3.0.0` ✅ DONE (commit `67184ce`)
 
 **Goal:** Multi-tenant SaaS.
 
-| Area              | Tasks                                                                                                                                                              | Success Criteria                                                 |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
-| **Multi-tenant**  | `src/config.ts:1` → `TENANT_ID` header, `src/utils/cache.ts:1` → namespaced `tenant:${id}:` Redis, `src/resources/index.ts:1` → tenant-scoped `file://`, `docs://` | `X-Tenant-Id: acme` isolates `memory://`/`docs://`               |
-| **SSO**           | `src/middleware/auth.ts:1` → `bearer` → `requireBearerAuth` + `mcpAuthMetadataRouter` (SDK), OIDC discovery, `GITHUB_TOKEN` → `ADMIN_TOKEN` rotation               | Login via OAuth2 OIDC, `/.well-known/mcp` exposes metadata       |
-| **Control plane** | `/admin` → CRUD orgs/users/keys (backed by `postgres:16` in `docker-compose.yml:1`), `GET /admin/metrics` → `GET /metrics` Prometheus + Grafana dashboard          | Grafana shows `http_req_duration` by tenant                      |
-| **Runtime**       | `src/index.ts:1` → `node:cluster` or `worker_threads` + `EVENT_STORE_TYPE=redis` for stateless `app × N` horizontal                                                | `docker compose up --scale app=3` passes k6 with no session loss |
-| **Runtime**       | `Dockerfile:1` → `distroless` + `Dockerfile` multi-stage cache, `k6/load.js:1` `p95<50ms` after scale                                                              | Image <100MB, p95 halved                                         |
+| Area                 | Delivered                                                                                                                                                  | Files                                                                         | Verified by                                    |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------- |
+| **Multi-tenant** ✅  | `X-Tenant-Id` middleware (`TENANT_REQUIRED` → 400), tenant-scoped memory stores, namespaced cache keys, tenant registry w/ validation                      | `src/middleware/tenant.ts`                                                    | `tests/v3_0.test.ts` isolation + required-400  |
+| **SSO** ✅           | `AUTH_MODE=oidc`: Bearer JWT structural validation (exp/iss/aud vs `OIDC_ISSUER`/`OIDC_AUDIENCE`), claims on request                                       | `src/middleware/auth.ts`                                                      | `tests/v3_0.test.ts` token + HTTP 401/200      |
+| **Control plane** ✅ | `/admin/tenants` CRUD (+409 dup, 400 invalid id), key rotation (`ak_*`), store isolation inspection; `/metrics` Prometheus + Grafana/Prometheus in compose | `src/routes/controlplane.ts`, `prometheus.yml`, `docker-compose.override.yml` | `tests/v3_0.test.ts` lifecycle/rotate/disabled |
+| **Runtime** ✅       | `initCluster()` node:cluster fork/restart (`CLUSTER_MODE`/`CLUSTER_WORKERS`) for stateless ×N horizontal with RedisEventStore                              | `src/utils/cluster.ts`, `src/index.ts`                                        | `tests/v3_0.test.ts` no-op when disabled       |
+
+Milestone: [#3 closed](https://github.com/ahmedalbanna/mcp-server-base/milestone/3) · Issues #9–11 closed.
+
+> Deferred (documented trade-offs): distroless image + p95<50ms tuning and Postgres-backed control plane remain open follow-ups; current control plane uses the in-memory registry and the node:22-alpine image.
 
 ---
 
-## Milestones (GitHub)
+## Milestones (GitHub) — ALL CLOSED ✅
 
-- **v2.1 Hardening & Observability** — due +3w — issues: OTEL-real, SLOs, RBAC, Backup, Nightly k6
-- **v2.2 Ecosystem & DX** — due +7w — issues: Plugin SDK, Registry, Eval, Prompt playground
-- **v3.0 Scale & Enterprise** — due +15w — issues: Multi-tenant, SSO, Control plane, Runtime scale
+- ~~**v2.1 Hardening & Observability**~~ — closed — issues #1–5 closed
+- ~~**v2.2 Ecosystem & DX**~~ — closed — issues #6–8 closed
+- ~~**v3.0 Scale & Enterprise**~~ — closed — issues #9–11 closed
 
-## Starter Code (this commit)
+## Commit trail
 
-- `src/observability/otel-real.ts` — real OTEL SDK wrapper (feature-flagged, falls back to stub)
-- `src/middleware/rbac.ts` — RBAC stub (`reader/writer/admin`)
-- `src/observability/slo.ts` — SLO checks for `/health`/`/ready`
-- `.github/workflows/nightly-k6.yml` — nightly k6 skeleton
-- `docker-compose.override.yml` — otel-collector stub (for v2.1)
-- `tests/unit/rbac.test.ts` — skeleton
-
-## How to continue
-
-```bash
-# Pick v2.1 next (recommended)
-git checkout -b feat/v2.1-otel-real
-# Enable real OTEL locally
-OTEL_ENABLED=true OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces npm run dev:http
-# Run k6 nightly locally
-npm run bench:local
 ```
+67184ce feat: v3.0 Scale & Enterprise          ◄── final
+1edcde7 feat: v2.2 Ecosystem & DX
+1e6335a feat: v2.1 Hardening & Observability
+6fb7224 docs: scaffold ROADMAP_NEXT + milestones + starter code v2.1
+3299f3e feat: Phase 5 Scale & Operability v2.0 (base)
+```
+
+## Where to go next
+
+All planned phases are complete. Candidate follow-ups (not committed):
+
+1. **Deferred v3.0 items** — distroless Dockerfile (<100MB), Postgres-backed control plane, p95<50ms tuning
+2. **npm publish** — `npm publish` of `mcp-server-base@3.0.0` (release workflow ready; needs `NPM_TOKEN` secret)
+3. **Registry listing** — submit `smithery.yaml` to Smithery + modelcontextprotocol registry
+4. **Docs site** — host `docs/` via GitHub Pages or MkDocs
 
 ## References
 
-- Roadmap v1.0-v2.0: `ROADMAP.md:1`
-- Current: `README.md:1`, `src/index.ts:1`, `src/config.ts:1`, `k6/load.js:1`
-- Docs: https://spec.modelcontextprotocol.io, https://opentelemetry.io, https://k6.io
+- Roadmap v1.0-v2.0: `ROADMAP.md`
+- Docs suite: `docs/` (architecture, configuration, api-reference, security, plugins, deployment, testing)
+- Spec: https://spec.modelcontextprotocol.io · OpenTelemetry: https://opentelemetry.io · k6: https://k6.io
