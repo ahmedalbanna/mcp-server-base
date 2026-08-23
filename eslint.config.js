@@ -25,6 +25,7 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'warn',
       'no-console': ['warn', { allow: ['error', 'warn'] }],
       'prefer-const': 'warn',
+      'no-empty': ['error', { allowEmptyCatch: true }],
     },
   },
   {
@@ -33,6 +34,12 @@ export default tseslint.config(
       'no-console': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
       'no-empty': 'off',
+    },
+  },
+  {
+    files: ['src/tools/elicitation.tool.ts', 'src/tools/sampling.tool.ts', 'src/tools/database.tool.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
   {

@@ -32,6 +32,14 @@ const envSchema = z.object({
     .string()
     .default('false')
     .transform(v => v === 'true' || v === '1'),
+  // Phase 3
+  ALLOWED_ROOT: z.string().default('/tmp/mcp-data'),
+  ALLOW_SHELL: z
+    .string()
+    .default('false')
+    .transform(v => v === 'true' || v === '1'),
+  SHELL_ALLOWLIST: z.string().default('ls,cat,echo,pwd,head,tail,grep'),
+  DATABASE_PATH: z.string().default(':memory:'),
 });
 
 function parseEnv(
@@ -97,6 +105,18 @@ export const config = {
   },
   resumability: {
     enabled: env.RESUMABILITY_ENABLED,
+  },
+  fs: {
+    allowedRoot: env.ALLOWED_ROOT,
+  },
+  shell: {
+    allowed: env.ALLOW_SHELL,
+    allowlist: env.SHELL_ALLOWLIST.split(',')
+      .map(s => s.trim())
+      .filter(Boolean),
+  },
+  database: {
+    path: env.DATABASE_PATH,
   },
   // expose raw env for advanced use
   _env: env,

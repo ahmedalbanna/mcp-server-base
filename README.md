@@ -64,24 +64,43 @@ Streamable HTTP is the **new standard** replacing SSE (deprecated March 2025).
 
 ---
 
-## 🧰 Tools (4)
+## 🧰 Tools (18)
 
-| Tool         | Description     | Input                   |
-| ------------ | --------------- | ----------------------- |
-| `echo`       | Echo message    | `message`, `uppercase?` |
-| `calculator` | add/sub/mul/div | `operation`, `a`, `b`   |
-| `get_time`   | Current time    | `timezone?`             |
-| `fetch_url`  | Fetch URL       | `url`, `maxLength?`     |
+| Tool                     | Description                            | Input                           |
+| ------------------------ | -------------------------------------- | ------------------------------- |
+| `echo`                   | Echo message                           | `message`, `uppercase?`         |
+| `calculator`             | add/sub/mul/div                        | `operation`, `a`, `b`           |
+| `get_time`               | Current time                           | `timezone?`                     |
+| `fetch_url`              | Fetch URL                              | `url`, `maxLength?`             |
+| `list_files`             | List files under ALLOWED_ROOT          | `path?`, `recursive?`           |
+| `read_file`              | Read file (1MB limit)                  | `path`                          |
+| `write_file`             | Write file + triggers resource changed | `path`, `content`               |
+| `search_files`           | Search text inside files               | `query`, `path?`, `maxResults?` |
+| `memory_set`             | Set KV in memory                       | `key`, `value`                  |
+| `memory_get`             | Get KV                                 | `key`                           |
+| `memory_delete`          | Delete KV                              | `key`                           |
+| `memory_list`            | List KVs                               | —                               |
+| `memory_clear`           | Clear all                              | —                               |
+| `database_query`         | SQL via alasql (users, notes)          | `sql`                           |
+| `database_tables`        | List tables row counts                 | —                               |
+| `shell_execute`          | Shell (allowlist, disabled by default) | `command`, `timeout?`           |
+| `collect_user_info`      | Elicitation demo (contact/preferences) | `infoType?`                     |
+| `generate_with_sampling` | Sampling demo (LLM)                    | `prompt`, `maxTokens?`          |
 
-## 📦 Resources (2)
+## 📦 Resources (5)
 
-- `config://server-info` — server metadata (JSON)
+- `config://server-info` — server metadata (JSON, now includes `features`)
 - `greeting://{name}` — dynamic greeting template
+- `file:///{+path}` — sandboxed file (`ALLOWED_ROOT`), list + complete, `file:///notes.txt`
+- `memory://{key}` — memory KV, list + complete
+- `db://{table}/{id}` — demo DB row (users/notes), list + complete
 
-## 💬 Prompts (2)
+## 💬 Prompts (4)
 
 - `code-review` — args: `language`, `code`
 - `explain-concept` — args: `concept`, `level`
+- `summarize` — args: `text`, `length` (short/medium/long), `style` (bullets/paragraph/tldr)
+- `research` — args: `topic`, `depth` (overview/deep), `audience` (beginner/expert/executive)
 
 ---
 
