@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { logger } from '../utils/logger.js';
+import { scheduleSave } from '../utils/persistence.js';
 
 // Singleton in-memory KV (process lifetime)
 const memoryStore = new Map<string, string>();
@@ -26,6 +27,7 @@ export function registerMemoryTools(server: McpServer) {
       try {
         server.sendResourceListChanged();
       } catch {}
+      scheduleSave();
       return { content: [{ type: 'text', text: `Set ${key}` }] };
     }
   );
@@ -62,6 +64,7 @@ export function registerMemoryTools(server: McpServer) {
       try {
         server.sendResourceListChanged();
       } catch {}
+      if (existed) scheduleSave();
       return {
         content: [{ type: 'text', text: existed ? `Deleted ${key}` : `Key "${key}" not found` }],
         isError: !existed,
@@ -100,6 +103,7 @@ export function registerMemoryTools(server: McpServer) {
       try {
         server.sendResourceListChanged();
       } catch {}
+      scheduleSave();
       return { content: [{ type: 'text', text: `Cleared ${count} keys` }] };
     }
   );

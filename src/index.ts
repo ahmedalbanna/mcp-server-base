@@ -16,9 +16,27 @@ import { requestIdMiddleware } from './middleware/requestId.js';
 import { createMcpRateLimiter } from './middleware/rateLimit.js';
 import { registerAdminRoutes } from './routes/admin.js';
 import { createSpan, incrementCounter, recordHistogram } from './utils/otel.js';
+import { initOtel } from './observability/otel-real.js';
+import { checkSlo } from './observability/slo.js';
+import { mcpRbacMiddleware } from './middleware/rbac.js';
+import { loadBackup } from './utils/persistence.js';
+import {
+  getMetricsText,
+  httpRequestsTotal,
+  httpRequestDuration,
+  mcpSessionsActive,
+} from './utils/metrics.js';
 
 const args = process.argv.slice(2);
 const useHttp = args.includes('--http') || process.env.TRANSPORT === 'http';
+
+// Load backup at startup (v2.1)
+loadBackup().catch(err => logger.warn('Backup load at startup failed', { error: String(err) }));
+
+// Init OTEL if enabled (v2.1)
+if (config.otel.enabled) {
+  initOtel().catch(err => logger.warn('OTEL init failed', { error: String(err) }));
+}
 
 async function startStdio() {
   const span = createSpan('stdio.start', { version: config.server.version });
@@ -62,13 +80,13 @@ export function createHttpApp() {
       requestId: (req as any).requestId,
     });
     incrementCounter('http.requests', 1, { method: req.method, path: req.path });
-    // Attach span to req for later use
+    httpRequestsTotal.inc({ method: req.method, path: req.path, status: '0' });
     (req as any)._otelSpan = span;
     (req as any)._otelStart = start;
     next();
   });
 
-  // Finish span on response
+  // Finish span on response + Prometheus metrics
   app.use((_req, res, next) => {
     const req = _req as any;
     const originalEnd = res.end;
@@ -76,9 +94,15 @@ export function createHttpApp() {
       if (req._otelSpan) {
         const duration = Date.now() - req._otelStart;
         recordHistogram('http.duration', duration);
+        httpRequestDuration.observe({ method: req.method, path: req.path }, duration);
         req._otelSpan.end(res.statusCode >= 400 ? 'error' : 'ok', {
           statusCode: res.statusCode,
           durationMs: duration,
+        });
+        httpRequestsTotal.inc({
+          method: req.method,
+          path: req.path,
+          status: String(res.statusCode),
         });
       }
       return originalEnd.apply(res, args as any);
@@ -94,12 +118,46 @@ export function createHttpApp() {
   const authMiddleware = createAuthMiddleware();
   app.use('/mcp', authMiddleware);
 
-  // Health & readiness (no auth, no rate-limit counted)
-  app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', name: config.server.name, version: config.server.version });
+  // RBAC for MCP tools (v2.1)
+  app.use('/mcp', mcpRbacMiddleware);
+
+  // Health & readiness with SLO checks (v2.1)
+  app.get('/health', async (_req, res) => {
+    const slo = await checkSlo();
+    res.json({
+      status: slo.ok ? 'ok' : 'degraded',
+      name: config.server.name,
+      version: config.server.version,
+      uptime: slo.uptime,
+      checks: slo.checks,
+      otel: config.otel.enabled ? 'enabled' : 'disabled',
+      eventStore: config.eventStore.type,
+    });
   });
-  app.get('/ready', (_req, res) => {
-    res.json({ status: 'ready', uptime: process.uptime(), timestamp: new Date().toISOString() });
+
+  app.get('/ready', async (_req, res) => {
+    const slo = await checkSlo();
+    if (!slo.ok) {
+      res.status(503).json({ status: 'not_ready', checks: slo.checks });
+      return;
+    }
+    res.json({
+      status: 'ready',
+      uptime: slo.uptime,
+      timestamp: new Date().toISOString(),
+      checks: slo.checks,
+    });
+  });
+
+  // Prometheus metrics (v2.1)
+  app.get('/metrics', async (_req, res) => {
+    try {
+      const metrics = await getMetricsText();
+      res.setHeader('Content-Type', 'text/plain; version=0.0.4');
+      res.send(metrics);
+    } catch (err) {
+      res.status(500).send(String(err));
+    }
   });
 
   // Admin routes (protected, before MCP)
@@ -122,6 +180,7 @@ export function createHttpApp() {
       eventStore: config.eventStore.type,
       redis: !!config.cache.redisUrl,
     });
+    mcpSessionsActive.set(0);
 
     app.post('/mcp', async (req, res) => {
       const sessionId = req.headers['mcp-session-id'] as string | undefined;
@@ -143,6 +202,7 @@ export function createHttpApp() {
               transports[sessionId] = transport;
               reqLogger.info('Session initialized', { sessionId });
               incrementCounter('mcp.sessions.created', 1);
+              mcpSessionsActive.set(Object.keys(transports).length);
             },
           });
           transport.onclose = () => {
@@ -151,6 +211,7 @@ export function createHttpApp() {
               reqLogger.info('Transport closed', { sessionId: sid });
               delete transports[sid];
               incrementCounter('mcp.sessions.closed', 1);
+              mcpSessionsActive.set(Object.keys(transports).length);
             }
           };
           const server = createMcpServer();
@@ -228,7 +289,6 @@ export function createHttpApp() {
       await server.connect(transport);
       await transport.handleRequest(req, res, req.body);
       incrementCounter('mcp.requests.stateless', 1);
-      // span ends on close
     } catch (err) {
       span.end('error', { error: String(err) });
       reqLogger.error('Error handling MCP request', err);
@@ -269,11 +329,12 @@ async function startHttp() {
     logger.info(`   → MCP endpoint: http://${config.http.host}:${config.http.port}/mcp`);
     logger.info(`   → Health: http://${config.http.host}:${config.http.port}/health`);
     logger.info(`   → Ready: http://${config.http.host}:${config.http.port}/ready`);
+    logger.info(`   → Metrics: http://${config.http.host}:${config.http.port}/metrics`);
     logger.info(
       `   → Admin: http://${config.http.host}:${config.http.port}/admin ${config.admin.enabled ? '(enabled)' : '(disabled)'}`
     );
     logger.info(
-      `   → Auth mode: ${config.auth.mode}, Resumability: ${config.resumability.enabled ? 'enabled (' + config.eventStore.type + ')' : 'stateless'}, OTEL: ${config.otel.enabled ? 'enabled' : 'disabled'}`
+      `   → Auth mode: ${config.auth.mode}, Resumability: ${config.resumability.enabled ? 'enabled (' + config.eventStore.type + ')' : 'stateless'}, OTEL: ${config.otel.enabled ? 'enabled' : 'disabled'}, RBAC: enabled`
     );
     if (config.http.corsOrigin !== '*') {
       logger.info('   → CORS allowlist', { origins: config.http.corsOrigin });

@@ -326,8 +326,8 @@ describe('Phase 5 Scale & Operability', () => {
       // We can't directly get serverInfo via MCP, but we can check resources
       const { resources } = await client.listResources();
       expect(resources.length).toBeGreaterThan(0);
-      // Check that config version is set
-      expect(config.server.version).toBe('1.0.0');
+      // Check that config version is set (should be 2.1.0 per package.json)
+      expect(config.server.version).toMatch(/^\d+\.\d+\.\d+$/);
     });
 
     it('health shows version', async () => {

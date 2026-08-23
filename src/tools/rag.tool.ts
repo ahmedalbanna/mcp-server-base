@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
+import { scheduleSave } from '../utils/persistence.js';
 
 // Simple deterministic embedding (hash-based, no external API)
 // Dim 128, normalized cosine
@@ -101,6 +102,7 @@ export function registerRagTools(server: McpServer) {
       try {
         server.sendResourceListChanged();
       } catch {}
+      scheduleSave();
       return {
         content: [
           {
@@ -189,6 +191,7 @@ export function registerRagTools(server: McpServer) {
       try {
         server.sendResourceListChanged();
       } catch {}
+      scheduleSave();
       return { content: [{ type: 'text', text: `Cleared ${count} docs` }] };
     }
   );

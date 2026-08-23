@@ -1,7 +1,7 @@
 {
   "name": "mcp-server-base",
-  "version": "2.0.0",
-  "description": "Strong base MCP Server v2.0 Scale & Operability - Production ready with latest tech stack (2026)",
+  "version": "2.1.0",
+  "description": "Strong base MCP Server v2.1 Hardening & Observability - Production ready with latest tech stack (2026)",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -52,12 +52,19 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/auto-instrumentations-node": "^0.57.1",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.57.2",
+    "@opentelemetry/sdk-node": "^0.57.2",
+    "@opentelemetry/sdk-trace-base": "^2.10.0",
     "alasql": "^4.18.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.1",
     "express-rate-limit": "^8.6.2",
     "helmet": "^7.2.0",
+    "ioredis": "^5.11.1",
+    "prom-client": "^15.1.3",
     "zod": "^3.23.8",
     "zod-to-json-schema": "^3.23.5"
   },

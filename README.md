@@ -1,4 +1,4 @@
-# MCP Server Base v2.0 — Scale & Operability (2026)
+# MCP Server Base v2.1 — Hardening & Observability (2026)
 
 [![CI](https://github.com/ahmedalbanna/mcp-server-base/actions/workflows/ci.yml/badge.svg)](https://github.com/ahmedalbanna/mcp-server-base/actions/workflows/ci.yml)
 [![Node 20+](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](.nvmrc)
@@ -6,7 +6,7 @@
 [![TypeScript 5.7](https://img.shields.io/badge/TypeScript-5.7-3178c6)](https://www.typescriptlang.org/)
 [![License MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Coverage 91%](https://img.shields.io/badge/coverage-91%25-brightgreen)](vitest.config.ts)
-[![Version 2.0.0](https://img.shields.io/badge/version-2.0.0-blue)](package.json)
+[![Version 2.1.0](https://img.shields.io/badge/version-2.1.0-blue)](package.json)
 
 Modern **Model Context Protocol** server using the latest stack:
 
@@ -17,7 +17,7 @@ Modern **Model Context Protocol** server using the latest stack:
 - Dual transport: **STDIO** (Claude Desktop) and **Streamable HTTP** (remote, 2025-03 spec, stateless + stateful resumability via **RedisEventStore**)
 - Structured tool/resource/prompt modules + **RAG (local vector)**, **Web (cached)**, **GitHub** integrations
 - **OTEL** tracing/metrics (`src/utils/otel.ts:1`), **Tasks** (experimental + `create_task`), **k6** load tests
-- `tsx` watch, `vitest` (130 tests, 91% coverage), graceful shutdown, `docker-compose` (redis, postgres, qdrant)
+- `tsx` watch, `vitest` (147 tests, 91% coverage), graceful shutdown, `docker-compose` (redis, postgres, qdrant, otel-collector)
 
 ---
 
@@ -189,22 +189,29 @@ rag_search { "query": "what is MCP?", "topK": 3 }
 
 ```
 src/
-├── index.ts              # entry: stdio + http (helmet/cors/rateLimit/auth/resumability)
-├── server.ts             # createMcpServer() factory
-├── config.ts             # zod env (AUTH, CORS, rateLimit, RAG, cache, integrations)
+├── index.ts              # entry: stdio + http (helmet/cors/rateLimit/auth/RBAC/OTEL/metrics)
+├── server.ts             # createMcpServer() factory (v2.1.0, instructions)
+├── config.ts             # zod env (AUTH, CORS, rateLimit, RAG, cache, integrations, OTEL, admin, tasks)
 ├── types.ts              # Zod schemas
 ├── middleware/auth.ts    # AUTH_MODE none|apiKey|bearer
 ├── middleware/rateLimit.ts
 ├── middleware/requestId.ts
+├── middleware/rbac.ts    # RBAC reader/writer/admin + mcpRbacMiddleware (v2.1)
+├── observability/otel-real.ts # OTEL NodeSDK init (v2.1)
+├── observability/slo.ts  # checkSlo() for /health/ready (v2.1)
 ├── utils/logger.ts       # stderr, JSON/text, redaction, child(requestId)
-├── utils/eventStore.ts   # InMemoryEventStore for Last-Event-ID
+├── utils/eventStore.ts   # InMemoryEventStore
+├── utils/redisEventStore.ts # RedisEventStore (scale)
 ├── utils/cache.ts        # MemoryCache (TTL) + defaultCache
 ├── utils/queue.ts        # SimpleQueue
+├── utils/metrics.ts      # prom-client Registry (v2.1)
+├── utils/persistence.ts  # save/load backup (v2.1)
+├── utils/otel.ts         # stub OTEL spans/metrics
 ├── tools/                # 31 tools: echo, fs, memory, db, shell, rag, web, github, elicitation, sampling, tasks
 │   ├── filesystem.tool.ts, memory.tool.ts, database.tool.ts, shell.tool.ts
 │   ├── rag.tool.ts, web.tool.ts, github.tool.ts, elicitation.tool.ts, sampling.tool.ts, tasks.tool.ts
 ├── resources/            # 6 resources: config, greeting, file, memory, db, docs
-├── routes/admin.ts       # Admin UI + metrics + spans
+├── routes/admin.ts       # Admin UI + metrics/spans/stores (v2.0) + /metrics Prometheus (v2.1)
 └── prompts/              # 4 prompts: code-review, explain-concept, summarize, research
 ```
 
@@ -243,8 +250,17 @@ Add a new tool: create `src/tools/my.tool.ts` → export `registerMyTool(server)
 - **Tasks** (`src/tools/tasks.tool.ts:1`) — experimental `delay_task` (if SDK tasks available) + fallback `create_task`/`get_task`/`get_task_result` (in-memory, polling), `SimpleQueue`/`MemoryCache` infra
 - **Bench** `k6/load.js:1` — `http_req_duration p(95)<100ms`, `stages` 10→50 VUs, `checks >99%`, `npm run bench` / `bench:local`
 - **Compose** `docker-compose.yml:1` already includes redis/postgres/qdrant for scale
-- Tests: `tests/scale.test.ts:1` (OTEL spans/metrics, RedisEventStore replay, cache TTL, queue, admin HTML/metrics/token/ready, tasks create/poll, version, k6 script) — 130 total
+- Tests: `tests/scale.test.ts:1` (OTEL spans/metrics, RedisEventStore replay, cache TTL, queue, admin HTML/metrics/token/ready, tasks create/poll, version, k6 script) — 130 total (now 147 with v2.1)
 - **Deploy** ready for Fly.io/Cloud Run (stateless + RedisEventStore), GHCR via `release.yml`, npm `2.0.0`
+
+## 🔒 Hardening & Observability (Phase 5 — v2.1) — NEW
+
+- **OTEL Real** `src/observability/otel-real.ts:1` — `initOtel()` dynamic import of `@opentelemetry/sdk-node` + `OTLPTraceExporter` (console fallback), `OTEL_ENABLED` + `OTEL_EXPORTER_OTLP_ENDPOINT`, graceful `shutdown` on SIGTERM
+- **SLOs** `src/observability/slo.ts:1` — `checkSlo()` (memory/rag/cache/uptime, `latencyMs`), `GET /health` → `{status, checks, uptime, version, otel, eventStore}` + `GET /ready` → `503` if not `ok`, `GET /metrics` → Prometheus `text/plain` via `prom-client` (`mcp_http_requests_total`, `mcp_http_request_duration_ms`, `mcp_sessions_active`)
+- **RBAC** `src/middleware/rbac.ts:1` — `reader < writer < admin` (`X-Role` header, JWT stub), `TOOL_ROLES` map (31 tools), `mcpRbacMiddleware` inspects `tools/call` body → `403` if `reader` tries `write_file`/`shell_execute`, `GET /admin` → `admin` required
+- **Backup** `src/utils/persistence.ts:1` — `saveBackup()`/`loadBackup()`/`scheduleSave()` (500ms debounce) to `ALLOWED_ROOT/.backup.json` (dynamic `getBackupFile()`), logs Redis sync stub when `REDIS_URL` set, `loadBackup()` at startup in `src/index.ts:1`
+- **Metrics** `src/utils/metrics.ts:1` — `prom-client` `Registry` + `collectDefaultMetrics`, `httpRequestsTotal`/`httpRequestDuration`/`mcpToolCallsTotal`/`mcpSessionsActive`, `GET /metrics` handler
+- **Tests** `tests/v2_1.test.ts:1` (13 tests: SLO checks, RBAC `hasRole`/`X-Role` 403/200, `SLO health/metrics` 200 + Prometheus text, OTEL span, backup save/load + `scheduleSave` via `memory_set`, `initOtel` disabled/enabled) + `tests/unit/rbac.test.ts:1` (4 tests) — total 147
 
 - Logger stderr-safe, never logs secrets (redaction)
 - Zod → JSON Schema via SDK (`src/types.ts:1`, `src/tools/*.tool.ts`)
@@ -253,7 +269,7 @@ Add a new tool: create `src/tools/my.tool.ts` → export `registerMyTool(server)
 - Health (`GET /health`) & ready (`GET /ready`) separate from MCP
 - Stateless default (`sessionIdGenerator: undefined`), stateful when `RESUMABILITY_ENABLED=true` (`src/index.ts:22`)
 - Type-safe, strict TS + ESLint flat + Prettier + husky + lint-staged
-- Coverage 85% lines / 70% branches enforced (`vitest.config.ts:1`), 130 tests: unit + e2e HTTP/security/capabilities/integrations/scale
+- Coverage 85% lines / 70% branches enforced (`vitest.config.ts:1`), 147 tests: unit + e2e HTTP/security/capabilities/integrations/scale/v2.1
 
 ## 🤝 Contributing
 
