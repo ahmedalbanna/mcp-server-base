@@ -10,7 +10,7 @@ const envSchema = z.object({
     .pipe(z.number().int().min(1).max(65535)),
   HOST: z.string().default('0.0.0.0'),
   MCP_SERVER_NAME: z.string().default('mcp-server-base'),
-  MCP_SERVER_VERSION: z.string().default('2.1.0'),
+  MCP_SERVER_VERSION: z.string().default('2.2.0'),
   CORS_ORIGIN: z.string().default('*'),
   AUTH_MODE: z.enum(['none', 'apiKey', 'bearer']).default('none'),
   API_KEY: z.string().optional(),

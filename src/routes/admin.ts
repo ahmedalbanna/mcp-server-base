@@ -39,13 +39,20 @@ export function registerAdminRoutes(
 body{font-family:system-ui;padding:2rem;max-width:900px;margin:auto}
 h1{color:#333} .card{border:1px solid #ddd;padding:1rem;margin:1rem 0;border-radius:8px}
 a{color:#0366d6} pre{background:#f6f8fa;padding:1rem;overflow:auto}
+input,select,textarea{width:100%;padding:0.5rem;margin:0.3rem 0}
+button{padding:0.5rem 1rem;background:#0366d6;color:white;border:none;border-radius:4px;cursor:pointer}
 </style></head>
 <body>
 <h1>🔧 MCP Admin - ${config.server.name} v${config.server.version}</h1>
 <p>Env: ${config.env} | Uptime: ${Math.floor(process.uptime())}s | Node: ${process.version}</p>
 <div class="card"><h3>Tools</h3><div id="tools">Loading...</div></div>
 <div class="card"><h3>Resources</h3><div id="resources">Loading...</div></div>
-<div class="card"><h3>Prompts</h3><div id="prompts">Loading...</div></div>
+<div class="card"><h3>Prompts Playground (v2.2)</h3>
+  <select id="promptSelect"><option value="code-review">code-review</option><option value="explain-concept">explain-concept</option><option value="summarize">summarize</option><option value="research">research</option></select>
+  <textarea id="promptArgs" rows="4" placeholder='{"language":"ts","code":"const x=1"}'></textarea>
+  <button onclick="previewPrompt()">Preview</button>
+  <pre id="promptPreview"></pre>
+</div>
 <div class="card"><h3>Metrics</h3><pre id="metrics">Loading...</pre></div>
 <div class="card"><h3>Live Spans (last 10)</h3><pre id="spans">Loading...</pre></div>
 <div class="card"><h3>Stores</h3><pre id="stores">Loading...</pre></div>
@@ -66,6 +73,15 @@ async function load(){
     const stores = await fetch('/admin/stores',{headers:h}).then(r=>r.json());
     document.getElementById('stores').textContent = JSON.stringify(stores,null,2);
   }catch(e){console.error(e)}
+}
+async function previewPrompt(){
+  const h = ${config.admin.token ? `{'X-Admin-Token':'${config.admin.token}'}` : '{}'};
+  h['Content-Type']='application/json';
+  const name = document.getElementById('promptSelect').value;
+  let args={}; try{args=JSON.parse(document.getElementById('promptArgs').value||'{}')}catch{}
+  const res = await fetch('/admin/prompts/'+name+'/preview',{method:'POST',headers:h,body:JSON.stringify(args)});
+  const data = await res.json();
+  document.getElementById('promptPreview').textContent = JSON.stringify(data,null,2);
 }
 load(); setInterval(load,5000);
 </script>
@@ -108,7 +124,19 @@ load(); setInterval(load,5000);
         'github_search_repos',
         'github_get_repo',
         'github_get_issue',
-        'delay_task',
+        'create_task',
+        'get_task',
+        'get_task_result',
+        // v2.2 plugins
+        'slack_list_channels',
+        'slack_post_message',
+        'slack_search',
+        'notion_search',
+        'notion_get_page',
+        'notion_create_page',
+        'linear_list_issues',
+        'linear_create_issue',
+        'linear_get_issue',
       ].map(name => ({ name }));
       res.json({ tools, count: tools.length, server: config.server.name });
     } catch (err) {
@@ -132,12 +160,64 @@ load(); setInterval(load,5000);
   app.get('/admin/prompts', requireAdminAuth, async (_req, res) => {
     res.json({
       prompts: [
-        { name: 'code-review' },
-        { name: 'explain-concept' },
-        { name: 'summarize' },
-        { name: 'research' },
+        { name: 'code-review', args: ['language', 'code'] },
+        { name: 'explain-concept', args: ['concept', 'level'] },
+        { name: 'summarize', args: ['text', 'length', 'style'] },
+        { name: 'research', args: ['topic', 'depth', 'audience'] },
       ],
     });
+  });
+
+  // Prompt playground preview (v2.2)
+  app.post('/admin/prompts/:name/preview', requireAdminAuth, async (req, res) => {
+    const name = req.params.name;
+    const args = req.body || {};
+    try {
+      // Simulate prompt rendering without needing client
+      let messages: any[] = [];
+      if (name === 'code-review') {
+        const { language = 'ts', code = 'const x=1' } = args;
+        messages = [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: `Please review this ${language} code.\n\n\`\`\`${language}\n${code}\n\`\`\``,
+            },
+          },
+        ];
+      } else if (name === 'explain-concept') {
+        const { concept = 'MCP', level = 'beginner' } = args;
+        messages = [
+          {
+            role: 'user',
+            content: { type: 'text', text: `Explain "${concept}" for a ${level} audience.` },
+          },
+        ];
+      } else if (name === 'summarize') {
+        const { text = 'hello', length = 'medium', style = 'bullets' } = args;
+        messages = [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: `Summarize (${length}, ${style}): ${text.slice(0, 200)}`,
+            },
+          },
+        ];
+      } else if (name === 'research') {
+        const { topic = 'MCP', depth = 'overview' } = args;
+        messages = [
+          { role: 'user', content: { type: 'text', text: `Research ${topic} depth=${depth}` } },
+        ];
+      } else {
+        res.status(404).json({ error: `Unknown prompt ${name}` });
+        return;
+      }
+      res.json({ prompt: name, args, messages, preview: true });
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
   });
 
   app.get('/admin/metrics', requireAdminAuth, (_req, res) => {

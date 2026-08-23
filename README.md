@@ -1,12 +1,13 @@
-# MCP Server Base v2.1 — Hardening & Observability (2026)
+# MCP Server Base v2.2 — Ecosystem & DX (2026)
 
 [![CI](https://github.com/ahmedalbanna/mcp-server-base/actions/workflows/ci.yml/badge.svg)](https://github.com/ahmedalbanna/mcp-server-base/actions/workflows/ci.yml)
 [![Node 20+](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](.nvmrc)
 [![MCP SDK 1.12.1](https://img.shields.io/badge/MCP%20SDK-1.12.1-blue)](https://github.com/modelcontextprotocol/typescript-sdk)
 [![TypeScript 5.7](https://img.shields.io/badge/TypeScript-5.7-3178c6)](https://www.typescriptlang.org/)
 [![License MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Coverage 91%](https://img.shields.io/badge/coverage-91%25-brightgreen)](vitest.config.ts)
-[![Version 2.1.0](https://img.shields.io/badge/version-2.1.0-blue)](package.json)
+[![Coverage 89%](https://img.shields.io/badge/coverage-89%25-brightgreen)](vitest.config.ts)
+[![Version 2.2.0](https://img.shields.io/badge/version-2.2.0-blue)](package.json)
+[![Smithery](https://img.shields.io/badge/Registry-smithery-orange)](smithery.yaml)
 
 Modern **Model Context Protocol** server using the latest stack:
 
@@ -15,9 +16,10 @@ Modern **Model Context Protocol** server using the latest stack:
 - **Zod** validation → auto JSON Schema + env validation (`src/config.ts:1`)
 - **Express 4** + **helmet** + **CORS allowlist** + **rate-limit** + health/ready + **Admin UI**
 - Dual transport: **STDIO** (Claude Desktop) and **Streamable HTTP** (remote, 2025-03 spec, stateless + stateful resumability via **RedisEventStore**)
-- Structured tool/resource/prompt modules + **RAG (local vector)**, **Web (cached)**, **GitHub** integrations
+- Structured tool/resource/prompt modules + **RAG hybrid (BM25+vector)**, **Web (cached)**, **GitHub** integrations
+- **Plugin SDK** (`src/plugin/index.ts:1`) + integrations (slack/notion/linear), **Registry** (smithery.yaml, mcpName), **Prompt Playground** at `/admin`
 - **OTEL** tracing/metrics (`src/utils/otel.ts:1`), **Tasks** (experimental + `create_task`), **k6** load tests
-- `tsx` watch, `vitest` (147 tests, 91% coverage), graceful shutdown, `docker-compose` (redis, postgres, qdrant, otel-collector)
+- `tsx` watch, `vitest` (163 tests, 89% coverage), graceful shutdown, `docker-compose` (redis, postgres, qdrant, otel-collector)
 
 ---
 
@@ -66,7 +68,7 @@ Streamable HTTP is the **new standard** replacing SSE (deprecated March 2025).
 
 ---
 
-## 🧰 Tools (31)
+## 🧰 Tools (40)
 
 | Tool                     | Description                            | Input                                    |
 | ------------------------ | -------------------------------------- | ---------------------------------------- |
@@ -89,7 +91,7 @@ Streamable HTTP is the **new standard** replacing SSE (deprecated March 2025).
 | `collect_user_info`      | Elicitation demo (contact/preferences) | `infoType?`                              |
 | `generate_with_sampling` | Sampling demo (LLM)                    | `prompt`, `maxTokens?`                   |
 | `rag_ingest`             | Ingest text (chunked, embedded)        | `text`, `id?`, `metadata?`, `chunk?`     |
-| `rag_search`             | Vector search (cosine)                 | `query`, `topK?`, `threshold?`           |
+| `rag_search`             | **Hybrid search (vector+BM25)**        | `query`, `topK?`, `threshold?`, `mode?`  |
 | `rag_list`               | List docs                              | —                                        |
 | `rag_clear`              | Clear vector store                     | —                                        |
 | `brave_search`           | Brave API (mock if no key)             | `query`, `count?`                        |
@@ -101,6 +103,15 @@ Streamable HTTP is the **new standard** replacing SSE (deprecated March 2025).
 | `create_task`            | Create background task                 | `duration?`, `payload?`                  |
 | `get_task`               | Get task status                        | `taskId`                                 |
 | `get_task_result`        | Get task result                        | `taskId`                                 |
+| `slack_list_channels`    | Slack channels (plugin)                | —                                        |
+| `slack_post_message`     | Slack post (plugin)                    | `channel`, `text`                        |
+| `slack_search`           | Slack search (plugin)                  | `query`, `count?`                        |
+| `notion_search`          | Notion search (plugin)                 | `query`, `page_size?`                    |
+| `notion_get_page`        | Notion page (plugin)                   | `page_id`                                |
+| `notion_create_page`     | Notion create (plugin)                 | `title`, `content?`                      |
+| `linear_list_issues`     | Linear issues (plugin)                 | `team?`, `limit?`                        |
+| `linear_create_issue`    | Linear create (plugin)                 | `title`, `description?`, `team?`         |
+| `linear_get_issue`       | Linear issue (plugin)                  | `id`                                     |
 
 ## 📦 Resources (6)
 
@@ -207,9 +218,11 @@ src/
 ├── utils/metrics.ts      # prom-client Registry (v2.1)
 ├── utils/persistence.ts  # save/load backup (v2.1)
 ├── utils/otel.ts         # stub OTEL spans/metrics
-├── tools/                # 31 tools: echo, fs, memory, db, shell, rag, web, github, elicitation, sampling, tasks
+├── tools/                # 40 tools: echo, fs, memory, db, shell, rag (hybrid), web, github, elicitation, sampling, tasks
 │   ├── filesystem.tool.ts, memory.tool.ts, database.tool.ts, shell.tool.ts
 │   ├── rag.tool.ts, web.tool.ts, github.tool.ts, elicitation.tool.ts, sampling.tool.ts, tasks.tool.ts
+├── plugin/index.ts       # Plugin SDK: definePlugin/registerPlugin (v2.2)
+├── integrations/         # slack/notion/linear plugins (v2.2)
 ├── resources/            # 6 resources: config, greeting, file, memory, db, docs
 ├── routes/admin.ts       # Admin UI + metrics/spans/stores (v2.0) + /metrics Prometheus (v2.1)
 └── prompts/              # 4 prompts: code-review, explain-concept, summarize, research
@@ -241,6 +254,15 @@ Add a new tool: create `src/tools/my.tool.ts` → export `registerMyTool(server)
 - **Stack** `docker-compose.yml:1` (app + redis:7 + postgres:16 + qdrant:v1.12.4) with healthchecks
 - **Demo** `rag_ingest → rag_search → docs://` E2E verified in `tests/integrations.test.ts:1` (21 tests)
 
+## 🔌 Ecosystem & DX (Phase 5 — v2.2) — NEW
+
+- **Plugin SDK** `src/plugin/index.ts:1` — `definePlugin({name, version, register})`, `registerPlugin(server, plugin)` (duplicate-tolerant), `getRegisteredPlugins()`, auto `sendToolListChanged` notifications
+- **Integrations** `src/integrations/` — `slackPlugin` (list/post/search), `notionPlugin` (search/get/create), `linearPlugin` (list/create/get) — all mocked without tokens (`SLACK_TOKEN`, `NOTION_TOKEN`); auto-registered in `src/server.ts:1`
+- **Registry** `smithery.yaml:1` — Smithery config + MCP Registry name `io.github.ahmedalbanna/mcp-server-base`, `package.json:1` `mcpName`/`files` fields
+- **Hybrid RAG** `src/tools/rag.tool.ts:1` — `rag_search` modes `vector|bm25|hybrid` (default hybrid, alpha 0.5), BM25 (k1=1.5, b=0.75) normalized + cosine re-rank; eval set `tests/eval/rag-eval.json` (20 Q/A) with p@5 ≥0.8 verified in `tests/v2_2.test.ts:1`
+- **Prompt Playground** `src/routes/admin.ts:1` — `POST /admin/prompts/:name/preview` renders prompts server-side; playground UI in `/admin` dashboard
+- **Tests** `tests/v2_2.test.ts:1` (16 tests: Plugin SDK define/register/dup/tools callable, registry files, hybrid modes, eval p@5, playground preview/UI/count) — total 163
+
 ## 📈 Scale & Operability (Phase 5 — v2.0)
 
 - **Versioned MCP** `v2.0.0` (`package.json:1`, `config.MCP_SERVER_VERSION`) with instructions per minor (`src/server.ts:1`)
@@ -269,7 +291,7 @@ Add a new tool: create `src/tools/my.tool.ts` → export `registerMyTool(server)
 - Health (`GET /health`) & ready (`GET /ready`) separate from MCP
 - Stateless default (`sessionIdGenerator: undefined`), stateful when `RESUMABILITY_ENABLED=true` (`src/index.ts:22`)
 - Type-safe, strict TS + ESLint flat + Prettier + husky + lint-staged
-- Coverage 85% lines / 70% branches enforced (`vitest.config.ts:1`), 147 tests: unit + e2e HTTP/security/capabilities/integrations/scale/v2.1
+- Coverage 85% lines / 70% branches enforced (`vitest.config.ts:1`), 163 tests: unit + e2e HTTP/security/capabilities/integrations/scale/v2.1/v2.2
 
 ## 🤝 Contributing
 

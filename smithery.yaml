@@ -1,0 +1,51 @@
+# Smithery registry config for mcp-server-base v2.2
+# https://smithery.ai/docs
+name: mcp-server-base
+displayName: MCP Server Base
+description: Strong base MCP Server v2.2 - Plugin SDK, hybrid RAG, prompt playground
+author: Ahmed Al-Banna
+license: MIT
+homepage: https://github.com/ahmedalbanna/mcp-server-base
+repository: https://github.com/ahmedalbanna/mcp-server-base
+keywords: [mcp, model-context-protocol, ai, rag, plugin]
+
+# Registry (modelcontextprotocol.io)
+# https://github.com/modelcontextprotocol/registry
+registry:
+  name: io.github.ahmedalbanna/mcp-server-base
+  title: MCP Server Base
+  description: Production-ready MCP base with 31 tools, 6 resources, 4 prompts, RAG, Web, GitHub, tasks, OTEL, admin
+  version: 2.2.0
+
+startCommand:
+  type: stdio
+  command: node
+  args: ["dist/index.js"]
+  # For HTTP deployment:
+  # type: http
+  # url: http://localhost:3000/mcp
+
+configSchema:
+  type: object
+  properties:
+    PORT:
+      type: string
+      default: "3000"
+    AUTH_MODE:
+      type: string
+      enum: [none, apiKey, bearer]
+      default: none
+    ALLOWED_ROOT:
+      type: string
+      default: /tmp/mcp-data
+    BRAVE_API_KEY:
+      type: string
+      description: Brave Search API key (optional, mock if empty)
+    GITHUB_TOKEN:
+      type: string
+      description: GitHub token for higher rate limit
+
+exampleConfig:
+  PORT: "3000"
+  AUTH_MODE: none
+  ALLOWED_ROOT: /tmp/mcp-data

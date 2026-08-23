@@ -1,0 +1,222 @@
+[
+  {
+    "id": "1",
+    "query": "What is MCP?",
+    "expected_ids": ["mcp-intro", "mcp-intro_chunk_0"],
+    "docs": [
+      {
+        "id": "mcp-intro",
+        "text": "MCP is Model Context Protocol, an open standard for connecting AI assistants to data sources. It defines tools, resources, and prompts."
+      }
+    ]
+  },
+  {
+    "id": "2",
+    "query": "How to list files?",
+    "expected_ids": ["fs-docs"],
+    "docs": [
+      {
+        "id": "fs-docs",
+        "text": "Use list_files tool to list files under ALLOWED_ROOT. It supports recursive listing."
+      }
+    ]
+  },
+  {
+    "id": "3",
+    "query": "Explain RAG",
+    "expected_ids": ["rag-docs"],
+    "docs": [
+      {
+        "id": "rag-docs",
+        "text": "RAG is Retrieval Augmented Generation. Ingest text via rag_ingest, search via rag_search, read via docs:// resource."
+      }
+    ]
+  },
+  {
+    "id": "4",
+    "query": "What is vector embedding?",
+    "expected_ids": ["vector-docs"],
+    "docs": [
+      {
+        "id": "vector-docs",
+        "text": "Vector embedding converts text to 128-dim normalized vectors for cosine similarity search."
+      }
+    ]
+  },
+  {
+    "id": "5",
+    "query": "How to handle auth?",
+    "expected_ids": ["auth-docs"],
+    "docs": [
+      {
+        "id": "auth-docs",
+        "text": "Auth modes: none, apiKey (X-API-Key), bearer (Authorization Bearer). Health/ready bypass auth."
+      }
+    ]
+  },
+  {
+    "id": "6",
+    "query": "What is BM25?",
+    "expected_ids": ["bm25-docs"],
+    "docs": [
+      {
+        "id": "bm25-docs",
+        "text": "BM25 is a ranking function for keyword search using term frequency and inverse document frequency."
+      }
+    ]
+  },
+  {
+    "id": "7",
+    "query": "Explain rate limiting",
+    "expected_ids": ["rate-docs"],
+    "docs": [
+      {
+        "id": "rate-docs",
+        "text": "Rate limiting uses express-rate-limit, default 100 per 15min on /mcp, returns 429 Too Many Requests."
+      }
+    ]
+  },
+  {
+    "id": "8",
+    "query": "What is OTEL?",
+    "expected_ids": ["otel-docs"],
+    "docs": [
+      {
+        "id": "otel-docs",
+        "text": "OTEL is OpenTelemetry for tracing and metrics, enabled via OTEL_ENABLED and OTLP endpoint."
+      }
+    ]
+  },
+  {
+    "id": "9",
+    "query": "How to use admin UI?",
+    "expected_ids": ["admin-docs"],
+    "docs": [
+      {
+        "id": "admin-docs",
+        "text": "Admin UI at /admin shows tools, resources, prompts, metrics, spans, stores. Protected by ADMIN_TOKEN via X-Admin-Token."
+      }
+    ]
+  },
+  {
+    "id": "10",
+    "query": "What is Redis event store?",
+    "expected_ids": ["redis-docs"],
+    "docs": [
+      {
+        "id": "redis-docs",
+        "text": "RedisEventStore enables horizontal scale, storing events for Last-Event-ID replay, fallback to memory if no REDIS_URL."
+      }
+    ]
+  },
+  {
+    "id": "11",
+    "query": "Explain Slack integration",
+    "expected_ids": ["slack-docs"],
+    "docs": [
+      {
+        "id": "slack-docs",
+        "text": "Slack plugin provides slack_list_channels, slack_post_message, slack_search. Mock if SLACK_TOKEN not set."
+      }
+    ]
+  },
+  {
+    "id": "12",
+    "query": "What is Notion plugin?",
+    "expected_ids": ["notion-docs"],
+    "docs": [
+      {
+        "id": "notion-docs",
+        "text": "Notion plugin provides notion_search, notion_get_page, notion_create_page. Mock if NOTION_TOKEN not set."
+      }
+    ]
+  },
+  {
+    "id": "13",
+    "query": "How to create task?",
+    "expected_ids": ["task-docs"],
+    "docs": [
+      {
+        "id": "task-docs",
+        "text": "Create background task via create_task with duration, poll via get_task and get_task_result. Experimental delay_task if tasks enabled."
+      }
+    ]
+  },
+  {
+    "id": "14",
+    "query": "Explain RBAC roles",
+    "expected_ids": ["rbac-docs"],
+    "docs": [
+      {
+        "id": "rbac-docs",
+        "text": "RBAC roles: reader < writer < admin. Use X-Role header. Write_file requires writer, shell_execute requires admin."
+      }
+    ]
+  },
+  {
+    "id": "15",
+    "query": "What is hybrid search?",
+    "expected_ids": ["hybrid-docs"],
+    "docs": [
+      {
+        "id": "hybrid-docs",
+        "text": "Hybrid search combines vector cosine and BM25 scores with alpha 0.5, re-ranked for better relevance."
+      }
+    ]
+  },
+  {
+    "id": "16",
+    "query": "How to run k6 benchmark?",
+    "expected_ids": ["k6-docs"],
+    "docs": [
+      {
+        "id": "k6-docs",
+        "text": "Run k6 via npm run bench or bench:local, thresholds p95<100ms, checks >99%."
+      }
+    ]
+  },
+  {
+    "id": "17",
+    "query": "Explain Docker compose stack",
+    "expected_ids": ["docker-docs"],
+    "docs": [
+      {
+        "id": "docker-docs",
+        "text": "Docker compose includes app, redis, postgres, qdrant, otel-collector with healthchecks."
+      }
+    ]
+  },
+  {
+    "id": "18",
+    "query": "What is SLO check?",
+    "expected_ids": ["slo-docs"],
+    "docs": [
+      {
+        "id": "slo-docs",
+        "text": "SLO checks memory, rag, cache, uptime via checkSlo(), used in /health and /ready."
+      }
+    ]
+  },
+  {
+    "id": "19",
+    "query": "How to persist backup?",
+    "expected_ids": ["backup-docs"],
+    "docs": [
+      {
+        "id": "backup-docs",
+        "text": "Backup saves memory and rag to ALLOWED_ROOT/.backup.json via scheduleSave(), loadBackup() at startup."
+      }
+    ]
+  },
+  {
+    "id": "20",
+    "query": "What is Prometheus metrics?",
+    "expected_ids": ["metrics-docs"],
+    "docs": [
+      {
+        "id": "metrics-docs",
+        "text": "Prometheus metrics via prom-client at /metrics: mcp_http_requests_total, mcp_http_request_duration_ms, mcp_sessions_active."
+      }
+    ]
+  }
+]

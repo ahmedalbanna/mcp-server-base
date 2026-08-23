@@ -1,7 +1,7 @@
 {
   "name": "mcp-server-base",
-  "version": "2.1.0",
-  "description": "Strong base MCP Server v2.1 Hardening & Observability - Production ready with latest tech stack (2026)",
+  "version": "2.2.0",
+  "description": "Strong base MCP Server v2.2 Ecosystem & DX - Production ready with plugin SDK, registry, hybrid RAG (2026)",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -32,8 +32,18 @@
     "model-context-protocol",
     "ai",
     "llm",
-    "server"
+    "server",
+    "rag",
+    "plugin",
+    "hybrid-search"
   ],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "smithery.yaml"
+  ],
+  "mcpName": "io.github.ahmedalbanna/mcp-server-base",
   "author": "Ahmed Al-Banna <ahmedalbanna966@gmail.com>",
   "license": "MIT",
   "repository": {

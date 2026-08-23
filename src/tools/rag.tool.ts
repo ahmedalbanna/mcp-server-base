@@ -58,6 +58,69 @@ export function clearVectorStore(): void {
   vectorStore.clear();
 }
 
+// Helpers for hybrid BM25 (v2.2)
+function tokenize(text: string): string[] {
+  return text.toLowerCase().split(/\W+/).filter(Boolean);
+}
+
+function computeBM25Scores(query: string, docs: RagDoc[]): Map<string, number> {
+  const N = docs.length;
+  const avgLen = docs.reduce((sum, d) => sum + tokenize(d.text).length, 0) / (N || 1);
+  const queryTokens = tokenize(query);
+  // doc freq for query tokens
+  const df = new Map<string, number>();
+  for (const token of new Set(queryTokens)) {
+    let count = 0;
+    for (const doc of docs) {
+      if (tokenize(doc.text).includes(token)) count++;
+    }
+    df.set(token, count);
+  }
+  const k1 = 1.5;
+  const b = 0.75;
+  const scores = new Map<string, number>();
+  for (const doc of docs) {
+    const docTokens = tokenize(doc.text);
+    const docLen = docTokens.length;
+    const tfMap = new Map<string, number>();
+    for (const t of docTokens) tfMap.set(t, (tfMap.get(t) || 0) + 1);
+    let score = 0;
+    for (const token of queryTokens) {
+      const tf = tfMap.get(token) || 0;
+      if (tf === 0) continue;
+      const dfVal = df.get(token) || 0;
+      const idf = Math.log((N - dfVal + 0.5) / (dfVal + 0.5) + 1);
+      const denom = tf + k1 * (1 - b + (b * docLen) / (avgLen || 1));
+      score += idf * ((tf * (k1 + 1)) / denom);
+    }
+    scores.set(doc.id, score);
+  }
+  return scores;
+}
+
+export function hybridSearch(
+  query: string,
+  docs: RagDoc[],
+  mode: 'vector' | 'bm25' | 'hybrid' = 'hybrid',
+  alpha = 0.5
+): { doc: RagDoc; score: number; vectorScore: number; bm25Score: number }[] {
+  const qVec = embed(query);
+  const bm25Scores = mode === 'vector' ? new Map<string, number>() : computeBM25Scores(query, docs);
+  const maxBm25 = Math.max(0, ...[...bm25Scores.values()]);
+  const scored = docs.map(doc => {
+    const vectorScore = cosine(qVec, doc.vector);
+    const rawBm25 = bm25Scores.get(doc.id) || 0;
+    const bm25Norm = maxBm25 > 0 ? rawBm25 / maxBm25 : 0;
+    let score: number;
+    if (mode === 'vector') score = vectorScore;
+    else if (mode === 'bm25') score = bm25Norm;
+    else score = alpha * vectorScore + (1 - alpha) * bm25Norm; // hybrid
+    return { doc, score, vectorScore, bm25Score: bm25Norm };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  return scored;
+}
+
 export function registerRagTools(server: McpServer) {
   server.registerTool(
     'rag_ingest',
@@ -119,7 +182,7 @@ export function registerRagTools(server: McpServer) {
     {
       title: 'RAG Search',
       description:
-        'Search vector store via cosine similarity (local embedding). Returns topK most relevant chunks.',
+        'Search vector store via hybrid (vector cosine + BM25) with re-rank. Modes: vector, bm25, hybrid (default). Returns topK most relevant chunks.',
       inputSchema: {
         query: z.string().min(1).describe('Search query'),
         topK: z.number().int().min(1).max(20).optional().default(3).describe('Top K results'),
@@ -130,31 +193,40 @@ export function registerRagTools(server: McpServer) {
           .optional()
           .default(0.0)
           .describe('Similarity threshold 0-1'),
+        mode: z
+          .enum(['vector', 'bm25', 'hybrid'])
+          .optional()
+          .default('hybrid')
+          .describe('Search mode'),
       },
     },
-    async ({ query, topK, threshold }) => {
+    async ({ query, topK, threshold, mode }) => {
       if (vectorStore.size === 0) {
         return { content: [{ type: 'text', text: 'Vector store empty. Use rag_ingest first.' }] };
       }
-      const qVec = embed(query);
-      const scored = [...vectorStore.values()].map(doc => ({
-        doc,
-        score: cosine(qVec, doc.vector),
-      }));
-      scored.sort((a, b) => b.score - a.score);
+      const docs = [...vectorStore.values()];
+      const scored = hybridSearch(query, docs, (mode as any) || 'hybrid');
       const filtered = scored.filter(s => s.score >= (threshold || 0)).slice(0, topK || 3);
       if (filtered.length === 0) {
         return {
           content: [
-            { type: 'text', text: `No results above threshold ${threshold} for "${query}"` },
+            {
+              type: 'text',
+              text: `No results above threshold ${threshold} for "${query}" (mode=${mode})`,
+            },
           ],
         };
       }
       const lines = filtered.map(
-        ({ doc, score }) =>
-          `score=${score.toFixed(3)} id=${doc.id} text="${doc.text.slice(0, 200)}${doc.text.length > 200 ? '...' : ''}" metadata=${JSON.stringify(doc.metadata)}`
+        ({ doc, score, vectorScore, bm25Score }) =>
+          `score=${score.toFixed(3)} (v=${vectorScore.toFixed(3)} bm25=${bm25Score.toFixed(3)}) id=${doc.id} text="${doc.text.slice(0, 200)}${doc.text.length > 200 ? '...' : ''}" metadata=${JSON.stringify(doc.metadata)}`
       );
-      logger.info('rag_search', { query: query.slice(0, 50), topK, results: filtered.length });
+      logger.info('rag_search', {
+        query: query.slice(0, 50),
+        topK,
+        mode,
+        results: filtered.length,
+      });
       return { content: [{ type: 'text', text: lines.join('\n\n') }] };
     }
   );
