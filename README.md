@@ -306,6 +306,18 @@ Add a new tool: create `src/tools/my.tool.ts` → export `registerMyTool(server)
 - Type-safe, strict TS + ESLint flat + Prettier + husky + lint-staged
 - Coverage 85% lines / 70% branches enforced (`vitest.config.ts:1`), 178 tests: unit + e2e HTTP/security/capabilities/integrations/scale/v2.1/v2.2/v3.0
 
+## 📚 Docs
+
+Full documentation in [`docs/`](docs/):
+
+- [Architecture](docs/architecture.md) — diagram, module map, request lifecycle
+- [Configuration](docs/configuration.md) — every env var + validation rules
+- [API Reference](docs/api-reference.md) — tools/resources/prompts/endpoints
+- [Security](docs/security.md) — auth, RBAC, OIDC, tenancy, hardening checklist
+- [Plugins](docs/plugins.md) — Plugin SDK guide + registry distribution
+- [Deployment](docs/deployment.md) — Docker, cluster/multi-replica scale, monitoring, k6
+- [Testing](docs/testing.md) — suite map, patterns, CI
+
 ## 🤝 Contributing
 
 See `CONTRIBUTING.md` — `nvm use`, `npm test`, add tool/resource/prompt, ensure `lint`/`typecheck`/`test` pass. See `CODE_OF_CONDUCT.md`.
