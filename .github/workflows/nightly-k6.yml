@@ -1,0 +1,52 @@
+name: Nightly k6
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # 02:00 UTC daily
+  workflow_dispatch:
+
+jobs:
+  k6:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Start server (http)
+        run: |
+          npm run start:http &
+          npx wait-on http://localhost:3000/health --timeout 30000
+          curl -s http://localhost:3000/health | cat
+
+      - name: Run k6 (install)
+        uses: grafana/setup-k6-action@v1
+
+      - name: Run load test
+        run: k6 run k6/load.js --out json=k6/results.json
+        env:
+          BASE_URL: http://localhost:3000
+
+      - name: Check thresholds (p95 <100ms)
+        run: |
+          cat k6/summary.json 2>/dev/null || cat k6/results.json | head -n 50
+          echo "p95 check via k6 thresholds (see k6/load.js: thresholds) "
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-results
+          path: |
+            k6/results.json
+            k6/summary.json
+          if-no-files-found: warn

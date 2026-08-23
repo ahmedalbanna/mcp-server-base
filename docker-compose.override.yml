@@ -1,0 +1,22 @@
+# Override for v2.1 OTEL (optional)
+# Usage: docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.100.0
+    container_name: mcp-otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "13133:13133" # health
+    restart: unless-stopped
+
+  app:
+    environment:
+      OTEL_ENABLED: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
+      ADMIN_ENABLED: "true"
+    depends_on:
+      - otel-collector
