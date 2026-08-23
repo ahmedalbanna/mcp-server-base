@@ -3,7 +3,6 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express from 'express';
 import cors from 'cors';
-import { randomUUID } from 'node:crypto';
 import { createMcpServer } from './server.js';
 import { config } from './config.js';
 import { logger } from './utils/logger.js';
@@ -29,13 +28,14 @@ async function startHttp() {
     res.json({ status: 'ok', name: config.server.name, version: config.server.version });
   });
 
-  // MCP endpoint - Streamable HTTP (latest spec, replaces SSE)
-  // Client POSTs to /mcp with JSON-RPC
+  // MCP endpoint - Streamable HTTP (latest spec, replaces SSE) - stateless mode
+  // Stateless: sessionIdGenerator: undefined enables simple per-request handling
+  // For stateful with resumability, see ROADMAP Phase 2 & SDK simpleStreamableHttp example
   app.post('/mcp', async (req, res) => {
     const server = createMcpServer();
     try {
       const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
+        sessionIdGenerator: undefined,
         enableJsonResponse: true,
       });
       res.on('close', () => {
@@ -56,24 +56,21 @@ async function startHttp() {
     }
   });
 
-  // Handle GET for SSE stream and DELETE for session termination (required by spec)
-  app.get('/mcp', async (req, res) => {
-    logger.info('GET /mcp - SSE stream request');
-    const server = createMcpServer();
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => randomUUID(),
+  // Stateless mode: GET/DELETE not supported, return 405 (see SDK simpleStatelessStreamableHttp)
+  app.get('/mcp', async (_req, res) => {
+    res.status(405).json({
+      jsonrpc: '2.0',
+      error: { code: -32000, message: 'Method not allowed.' },
+      id: null,
     });
-    await server.connect(transport);
-    await transport.handleRequest(req, res);
   });
 
-  app.delete('/mcp', async (req, res) => {
-    const server = createMcpServer();
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => randomUUID(),
+  app.delete('/mcp', async (_req, res) => {
+    res.status(405).json({
+      jsonrpc: '2.0',
+      error: { code: -32000, message: 'Method not allowed.' },
+      id: null,
     });
-    await server.connect(transport);
-    await transport.handleRequest(req, res);
   });
 
   app.listen(config.http.port, config.http.host, () => {
@@ -94,12 +91,12 @@ process.on('SIGTERM', () => {
 });
 
 if (useHttp) {
-  startHttp().catch((err) => {
+  startHttp().catch(err => {
     logger.error('Failed to start HTTP server', err);
     process.exit(1);
   });
 } else {
-  startStdio().catch((err) => {
+  startStdio().catch(err => {
     logger.error('Failed to start STDIO server', err);
     process.exit(1);
   });

@@ -1,0 +1,32 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - name: Publish to npm (optional)
+        run: npm publish --access public || echo "publish skipped"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Build Docker + GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker build -t ghcr.io/${{ github.repository }}:${{ github.ref_name }} -t ghcr.io/${{ github.repository }}:latest .
+          docker push ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+          docker push ghcr.io/${{ github.repository }}:latest

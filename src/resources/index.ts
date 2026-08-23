@@ -11,7 +11,7 @@ export function registerAllResources(server: McpServer) {
       description: 'Static information about this MCP server',
       mimeType: 'application/json',
     },
-    async (uri) => ({
+    async uri => ({
       contents: [
         {
           uri: uri.href,

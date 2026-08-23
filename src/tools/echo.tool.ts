@@ -7,7 +7,8 @@ export function registerEchoTool(server: McpServer) {
     'echo',
     {
       title: 'Echo Tool',
-      description: 'Echoes back the input message, optionally uppercased. Use for testing connectivity.',
+      description:
+        'Echoes back the input message, optionally uppercased. Use for testing connectivity.',
       inputSchema: {
         message: z.string().min(1).describe('Message to echo'),
         uppercase: z.boolean().optional().describe('Uppercase output'),
